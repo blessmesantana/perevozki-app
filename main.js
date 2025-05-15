@@ -1,4 +1,3 @@
-```javascript
 // main.js
 
 import { database } from './firebase.js';
