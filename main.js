@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const sidebarMenu = document.getElementById('sidebarMenu');
     const addDataButton = document.getElementById('addDataButton');
     const submitRawDataButton = document.getElementById('submitRawDataButton');
+    const showStatsButton = document.getElementById('showStatsButton');
+    const statsContainer = document.getElementById('statsContainer');
+    const statsList = document.getElementById('statsList');
     const rawDataInput = document.getElementById('rawData');
 
     let stream = null;
@@ -103,6 +106,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (addDataButton) {
         addDataButton.addEventListener('click', async () => {
             sidebarMenu.style.display = 'block';
+            rawDataInput.style.display = 'block';
+            submitRawDataButton.style.display = 'block';
+            statsContainer.style.display = 'none';
         });
     }
 
@@ -129,11 +135,28 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    if (showStatsButton) {
+        showStatsButton.addEventListener('click', async () => {
+            rawDataInput.style.display = 'none';
+            submitRawDataButton.style.display = 'none';
+            statsContainer.style.display = 'block';
+            await loadStats();
+        });
+    }
+
     // Функции
     function parseRawData(text) {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-        const courierName = lines[0];
+        if (lines.length === 0) return { courierName: '', deliveryIds: [] };
+
+        // Извлекаем фамилию из первой строки, убираем всё после первого пробела или дефиса
+        const firstLine = lines[0];
+        const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
+        const courierName = courierNameMatch ? courierNameMatch[0] : '';
+
+        // Извлекаем только 10-значные числа
         const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
+
         return { courierName, deliveryIds };
     }
 
@@ -176,7 +199,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
-            const camera = cameras[0] || null;
+            const camera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0] || null;
 
             if (!camera) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
@@ -184,9 +207,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            // Упростим запрос, убрав жесткое указание deviceId
             stream = await navigator.mediaDevices.getUserMedia({
-                video: true // Автоматический выбор камеры
+                video: {
+                    facingMode: { exact: "environment" } // Приоритет задней камеры
+                }
             });
 
             videoElement.srcObject = stream;
@@ -196,7 +220,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
 
-            codeReader.decodeFromVideoDevice(null, 'qr-video', (result, err) => {
+            codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
                 if (result) {
                     onScanSuccess(result.getText());
                     codeReader.reset();
@@ -296,6 +320,34 @@ document.addEventListener("DOMContentLoaded", function () {
         } finally {
             loadingIndicator.style.display = 'none';
             isProcessing = false;
+        }
+    }
+
+    async function loadStats() {
+        statsList.innerHTML = '';
+        try {
+            const scansRef = ref(database, 'scans');
+            const scansQuery = query(scansRef);
+            const scansSnapshot = await get(scansQuery);
+
+            if (scansSnapshot.exists()) {
+                scansSnapshot.forEach(scanSnap => {
+                    const scanData = scanSnap.val();
+                    const li = document.createElement('li');
+                    const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
+                    li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
+                    statsList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.textContent = 'Сканирований пока нет.';
+                statsList.appendChild(li);
+            }
+        } catch (e) {
+            console.error('Ошибка загрузки статистики:', e);
+            const li = document.createElement('li');
+            li.textContent = 'Ошибка загрузки статистики.';
+            statsList.appendChild(li);
         }
     }
 
