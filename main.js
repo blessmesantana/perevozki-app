@@ -1,11 +1,10 @@
 // main.js
 
 import { database } from './firebase.js';
-import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
+import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", function () {
-    const resultDiv = document.getElementById('result');
-    const resultTransferId = document.getElementById('resultTransferId');
+    const resultDiv = document.getElementರ: const resultTransferId = document.getElementById('resultTransferId');
     const resultCourier = document.getElementById('resultCourier');
     const resultPrevious = document.getElementById('resultPrevious');
     const resultStatus = document.getElementById('resultStatus');
@@ -149,12 +148,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
-        // Извлекаем фамилию из первой строки, убираем всё после первого пробела или дефиса
         const firstLine = lines[0];
         const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
         const courierName = courierNameMatch ? courierNameMatch[0] : '';
 
-        // Извлекаем только 10-значные числа
         const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
 
         return { courierName, deliveryIds };
@@ -209,12 +206,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { exact: "environment" } // Приоритет задней камеры
+                    facingMode: { exact: "environment" }
                 }
             });
 
             videoElement.srcObject = stream;
             await videoElement.play();
+
+            qrContainer.querySelector('#qr-reader').classList.add('active');
 
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
@@ -233,7 +232,11 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         } catch (err) {
             console.error('Ошибка камеры:', err.name, err.message, err.constraint);
-            showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
+            if (err.name === 'NotAllowedError') {
+                showMessage('error', 'Доступ к камере заблокирован. Разрешите доступ в настройках браузера.', '', '', '');
+            } else {
+                showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
+            }
             qrIcon.style.display = 'block';
         }
     }
@@ -333,8 +336,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (scansSnapshot.exists()) {
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
-                    const li = document.createElement('li');
                     const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
+                    const li = document.createElement('li');
                     li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
                     statsList.appendChild(li);
                 });
@@ -358,6 +361,7 @@ document.addEventListener("DOMContentLoaded", function () {
             videoElement.srcObject = null;
         }
         if (codeReader) codeReader.reset();
+        qrContainer.querySelector('#qr-reader').classList.remove('active');
         qrIcon.style.display = 'block';
         loadingIndicator.style.display = 'none';
     }
