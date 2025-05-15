@@ -266,7 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         navigator.vibrate?.(200);
         flashFrame();
-        processTransferId(decodedText);
+        processTransferId(decodedText); // Вызываем processTransferId с результатом сканирования
     }
 
     function flashFrame() {
@@ -287,6 +287,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const courier = couriersCache[delivery ? delivery.courier_id : null];
 
             if (delivery) {
+                // Отображаем данные из кэша
                 resultTransferId.textContent = `ID передачи: ${cleanedId}`;
                 resultCourier.textContent = `Курьер: ${courier ? courier.courier_name : 'Не назначен'}`;
                 resultPrevious.textContent = `Предыдущее местоположение: ${delivery.previous_location || 'Неизвестно'}`;
@@ -310,6 +311,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
 
             } else {
+                // Отображаем сообщение, что не найдено
                 resultTransferId.textContent = `ID передачи: ${cleanedId} не найден`;
                 resultCourier.textContent = '';
                 resultPrevious.textContent = '';
