@@ -11,6 +11,8 @@
 </head>
 <body>
     <button class="sidebar-button" id="sidebarToggle" aria-label="Открыть меню">☰</button>
+
+    <!-- Основной контент -->
     <div class="page">
         <div class="button-group" id="controlGroup">
             <button class="button-group-item" id="inputModeButton" aria-label="Переключиться на ручной ввод ID">ID передачи</button>
@@ -19,6 +21,7 @@
                 <button class="button-group-item" id="manualSubmitButton" aria-label="Отправить ID">Отправить</button>
             </div>
         </div>
+
         <div class="qr-container">
             <div id="qr-reader">
                 <video id="qr-video" playsinline muted></video>
@@ -28,6 +31,7 @@
             </svg>
             <div class="loading-indicator" id="loadingIndicator">Сканирование...</div>
         </div>
+
         <div id="result" class="scan-result">
             <div class="transfer-id" id="resultTransferId"></div>
             <div class="courier-name" id="resultCourier"></div>
@@ -35,13 +39,18 @@
             <div class="status" id="resultStatus"></div>
             <div class="raw-data" id="resultRawData"></div>
         </div>
+
         <button class="scan-button" id="scanButton" aria-label="Сканировать QR-код">Сканировать QR код</button>
         <p class="info-text">Сканируйте QR передачи или введите ID вручную</p>
     </div>
+
+    <!-- Сайдбар -->
     <div class="sidebar-menu" id="sidebarMenu">
-        <button id="add-data-button" aria-label="Добавить данные">📥 Добавить данные</button>
-        <textarea id="raw-data" placeholder="Агаев&#10;Доставлено&#10;70&#10;3763009542"></textarea>
+        <h3>Добавить данные</h3>
+        <textarea id="rawData" placeholder="Агаев&#10;Доставлено&#10;70&#10;3763009542"></textarea>
+        <button id="addDataButton">📥 Добавить данные</button>
     </div>
-    <script type="module" src="main.js"></script>
+
+    <script type="module" src="./main.js"></script>
 </body>
 </html>
