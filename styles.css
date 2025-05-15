@@ -25,13 +25,11 @@ html {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     overflow: hidden;
 }
 
 .button-group {
-    position: relative;
-    z-index: 10;
     width: 100%;
     height: 40px;
     padding: 2px;
@@ -55,7 +53,6 @@ html {
     cursor: pointer;
     transition: background 0.5s ease, color 0.5s ease, transform 0.5s ease;
     border: none;
-    pointer-events: auto;
 }
 
 #inputModeButton {
@@ -115,7 +112,6 @@ html {
 .qr-container {
     width: 260px;
     height: 260px;
-    position: relative;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -123,7 +119,7 @@ html {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     overflow: hidden;
     margin: 20px 0;
-    z-index: 5;
+    position: relative;
     --frame-color: #ea1e63;
 }
 
@@ -133,17 +129,12 @@ html {
     border: none;
     border-radius: 20px;
     overflow: hidden;
-    display: none;
-}
-
-#qr-reader.active {
-    display: block;
 }
 
 #qr-reader video {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: fill;
     border-radius: 20px;
 }
 
@@ -167,11 +158,13 @@ html {
         opacity: 1;
         border-width: 4px;
     }
+
     50% {
         border-color: #4caf50;
         opacity: 0.5;
         border-width: 2px;
     }
+
     100% {
         border-color: #ea1e63;
         opacity: 1;
@@ -183,6 +176,17 @@ html {
     animation: flash 0.8s ease;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .button-group-item,
+    .qr-container::before,
+    #manualSubmitButton,
+    #inputModeButton {
+        transition: none;
+        animation: none;
+    }
+}
+
+.qr部分: none;
 .qr-icon {
     position: absolute;
     width: 80px;
@@ -190,11 +194,11 @@ html {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 5;
+    z-index: 11;
     pointer-events: none;
 }
 
-#qr-reader.active + .qr-icon {
+#qr-reader:not(:empty) + .qr-icon {
     display: none;
 }
 
@@ -214,8 +218,6 @@ html {
 }
 
 .scan-result {
-    position: relative;
-    z-index: 10;
     width: 226px;
     border-radius: 28px;
     display: none;
@@ -289,8 +291,6 @@ html {
 }
 
 .scan-button {
-    position: relative;
-    z-index: 10;
     width: 293px;
     height: 55px;
     background: #ea1e63;
@@ -302,7 +302,6 @@ html {
     margin: 20px 0;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     transition: background 0.3s ease;
-    pointer-events: auto;
 }
 
 .scan-button:active {
@@ -332,7 +331,6 @@ html {
     color: white;
     cursor: pointer;
     z-index: 1001;
-    pointer-events: auto;
 }
 
 .sidebar-menu {
@@ -356,7 +354,6 @@ html {
     width: 100%;
     font-size: 14px;
     cursor: pointer;
-    pointer-events: auto;
 }
 
 .sidebar-menu button:hover {
@@ -459,14 +456,3 @@ html {
         margin-top: 2px;
     }
 }
-
-@media (prefers-reduced-motion: reduce) {
-    .button-group-item,
-    .qr-container::before,
-    #manualSubmitButton,
-    #inputModeButton {
-        transition: none;
-        animation: none;
-    }
-}
-```
