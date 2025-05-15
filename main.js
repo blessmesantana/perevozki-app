@@ -1,9 +1,10 @@
-// Добавлены недостающие импорты и проверки
 import { database } from './firebase.js';
-import { ref, push, set, get, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
+import { 
+    ref, push, set, get, query, orderByChild, equalTo 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
 
 document.addEventListener("DOMContentLoaded", function () {
-    // Инициализация элементов DOM с проверкой
+    // Инициализация элементов DOM
     const elements = {
         resultDiv: document.getElementById('result'),
         resultTransferId: document.getElementById('resultTransferId'),
@@ -41,21 +42,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const scanDelay = 2000;
     let isProcessing = false;
 
-    // Функция для показа сообщений с улучшенной обработкой
+    // Функция показа сообщений
     function showMessage(status, message, courier = '', previousCourier = '', rawData = '') {
-        if (!elements.resultDiv) {
-            console.error('resultDiv is null');
-            return;
-        }
-        
+        if (!elements.resultDiv) return;
         elements.resultDiv.className = `scan-result ${status}`;
         elements.resultTransferId.textContent = message;
         elements.resultCourier.textContent = courier ? `Курьер: ${courier}` : '';
-        elements.resultPrevious.textContent = previousCourier ? `Предыдущий курьер: ${previousCourier}` : '';
+        elements.resultPrevious.textContent = previousCourier ? `Ранее сканировал: ${previousCourier}` : '';
         elements.resultStatus.textContent = status;
         elements.resultRawData.textContent = rawData ? `Сырые данные: ${rawData}` : '';
         elements.resultDiv.style.display = 'flex';
-        
         setTimeout(() => {
             elements.resultDiv.style.display = 'none';
             if (status === 'success' || status === 'already_scanned') {
@@ -64,7 +60,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 5000);
     }
 
-    // Улучшенная инициализация ZXing
+    // Инициализация ZXing
     async function initZXing() {
         try {
             if (typeof ZXing === 'undefined') {
@@ -77,10 +73,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Обработчики событий с улучшенной обработкой ошибок
+    // Обработчики событий
     if (elements.inputModeButton) {
         elements.inputModeButton.addEventListener('click', () => {
-            console.log('Input mode button clicked');
             if (elements.manualInputContainer) {
                 elements.manualInputContainer.style.display = 'flex';
             }
@@ -94,12 +89,10 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Улучшенная обработка ввода вручную
     if (elements.manualSubmitButton) {
         elements.manualSubmitButton.addEventListener('click', () => {
             const transferId = elements.manualTransferIdInput?.value.trim() || '';
             const cleanedId = transferId.replace(/[^\d]/g, '');
-            
             if (/^\d{4}$/.test(cleanedId) || /^\d{10}$/.test(cleanedId)) {
                 processTransferId(cleanedId);
             } else {
@@ -112,41 +105,31 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Улучшенный запуск сканера
     if (elements.scanButton) {
         elements.scanButton.addEventListener('click', () => {
-            console.log('Scan button clicked');
             startQrScanner();
         });
     }
 
-    // Оптимизированный поиск в базе данных
+    // Основная логика обработки ID
     async function processTransferId(transferId) {
         if (isProcessing) return;
         isProcessing = true;
-        
-        if (elements.loadingIndicator) {
-            elements.loadingIndicator.style.display = 'block';
-        }
-        
+        if (elements.loadingIndicator) elements.loadingIndicator.style.display = 'block';
         try {
             const cleanedId = transferId.replace(/[^\d]/g, '');
-            
             if (cleanedId.length !== 4 && cleanedId.length !== 10) {
                 showMessage('error', 'Неверный формат ID');
                 return;
             }
-
-            // Оптимизированный поиск по базе данных
+            // Поиск доставки по ID
             const deliveriesRef = ref(database, 'deliveries');
             const deliveryQuery = query(deliveriesRef, orderByChild('id'), equalTo(cleanedId));
             const deliverySnapshot = await get(deliveryQuery);
-            
             if (!deliverySnapshot.exists()) {
                 showMessage('not_found', cleanedId);
                 return;
             }
-
             let courierName = '';
             deliverySnapshot.forEach(childSnapshot => {
                 const data = childSnapshot.val();
@@ -154,12 +137,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     courierName = data.courier_name;
                 }
             });
-
             // Проверка дубликатов
             const scansRef = ref(database, 'scans');
             const scanQuery = query(scansRef, orderByChild('delivery_id'), equalTo(cleanedId));
             const scanSnapshot = await get(scanQuery);
-            
             if (scanSnapshot.exists()) {
                 let prevCourier = '';
                 scanSnapshot.forEach(scanSnap => {
@@ -168,11 +149,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         prevCourier = scanData.courier_name;
                     }
                 });
-                
                 showMessage('already_scanned', cleanedId, courierName, `Ранее сканировал: ${prevCourier}`);
                 return;
             }
-
             // Сохранение нового сканирования
             const newScanRef = push(scansRef);
             await set(newScanRef, { 
@@ -180,21 +159,17 @@ document.addEventListener("DOMContentLoaded", function () {
                 courier_name: courierName, 
                 timestamp: Date.now() 
             });
-            
             showMessage('success', cleanedId, courierName);
-            
         } catch (e) {
             console.error('Ошибка поиска:', e);
             showMessage('error', 'Ошибка при поиске');
         } finally {
             isProcessing = false;
-            if (elements.loadingIndicator) {
-                elements.loadingIndicator.style.display = 'none';
-            }
+            if (elements.loadingIndicator) elements.loadingIndicator.style.display = 'none';
         }
     }
 
-    // Улучшенный запуск сканера QR
+    // Запуск сканера QR
     async function startQrScanner() {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -202,35 +177,27 @@ document.addEventListener("DOMContentLoaded", function () {
                 device.kind === 'videoinput' && 
                 device.label.toLowerCase().includes('back')
             ) || devices.find(device => device.kind === 'videoinput');
-            
             if (!camera) {
                 showMessage('error', 'Камера не найдена');
                 if (elements.qrIcon) elements.qrIcon.style.display = 'block';
                 return;
             }
-            
             stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { deviceId: camera.deviceId } 
             });
-            
             if (elements.videoElement) {
                 elements.videoElement.srcObject = stream;
                 await elements.videoElement.play();
             }
-            
             if (elements.qrIcon) elements.qrIcon.style.display = 'none';
-            
             await initZXing();
-            
             if (!codeReader) return;
-            
             codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
                 if (result) {
                     onScanSuccess(result.text);
                     if (codeReader) codeReader.reset();
                     stopQrScanner();
                 }
-                
                 if (err && !(err instanceof ZXing.NotFoundException)) {
                     console.error('Ошибка сканирования:', err);
                     showMessage('error', 'Ошибка сканирования');
@@ -243,58 +210,39 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Улучшенная обработка успешного сканирования
+    // Обработка успешного сканирования
     function onScanSuccess(decodedText) {
         const now = Date.now();
         if (now - lastScanTime < scanDelay) return;
-        
         lastScanTime = now;
-        
-        // Проверка поддержки вибрации
-        if (navigator.vibrate) {
-            navigator.vibrate(200);
-        }
-        
+        if (navigator.vibrate) navigator.vibrate(200);
         flashFrame();
         processTransferId(decodedText);
     }
 
-    // Улучшенная функция валидации данных
+    // Валидация и сохранение данных
     function parseRawData(text) {
         const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-        
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
-        
-        // Улучшенная валидация имени курьера
         const courierNameMatch = lines[0].match(/^[А-Яа-яЁёA-Za-z\s]+/);
         const courierName = courierNameMatch ? courierNameMatch[0] : '';
-        
-        // Улучшенная валидация ID доставки
-        const deliveryIds = lines.slice(1)
-            .filter(line => /^\d{10}$/.test(line.trim()));
-            
+        const deliveryIds = lines.slice(1).filter(line => /^\d{10}$/.test(line.trim()));
         return { courierName, deliveryIds };
     }
 
-    // Улучшенная обработка сохранения данных
     async function saveCourierAndDeliveries(courierName, deliveryIds) {
         try {
             if (!courierName || deliveryIds.length === 0) {
                 showMessage('error', 'Неверный формат данных');
                 return;
             }
-            
-            // Проверка существования курьера
             const couriersRef = ref(database, 'couriers');
             const courierQuery = query(couriersRef, orderByChild('name'), equalTo(courierName));
             const courierSnapshot = await get(courierQuery);
-            
             let courierId;
             if (courierSnapshot.exists()) {
-                // Используем существующего курьера
                 courierId = Object.keys(courierSnapshot.val())[0];
             } else {
-                // Создаем нового курьера
                 const newCourierRef = push(couriersRef);
                 await set(newCourierRef, { 
                     name: courierName, 
@@ -303,8 +251,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 courierId = newCourierRef.key;
             }
-            
-            // Сохранение данных о доставках
             const deliveriesRef = ref(database, 'deliveries');
             for (const id of deliveryIds) {
                 const newDeliveryRef = push(deliveriesRef);
@@ -315,24 +261,21 @@ document.addEventListener("DOMContentLoaded", function () {
                     timestamp: Date.now() 
                 });
             }
-            
             showMessage('success', 'Данные сохранены');
             if (elements.rawDataInput) elements.rawDataInput.value = '';
-            
         } catch (e) {
             console.error('Ошибка сохранения:', e);
             showMessage('error', 'Ошибка сохранения');
         }
     }
 
-    // Улучшенная загрузка статистики
+    // Загрузка статистики
     async function loadStats() {
         elements.statsList.innerHTML = '';
         try {
             const scansRef = ref(database, 'scans');
             const scanQuery = query(scansRef, orderByChild('timestamp'), equalTo(Date.now()));
             const snapshot = await get(scanQuery);
-            
             if (snapshot.exists()) {
                 snapshot.forEach(childSnapshot => {
                     const scanData = childSnapshot.val();
@@ -354,30 +297,41 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Улучшенная остановка сканера
+    // Остановка сканера
     function stopQrScanner() {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
             if (elements.videoElement) elements.videoElement.srcObject = null;
         }
-        
         if (codeReader) {
             codeReader.reset();
             codeReader = null;
         }
-        
         if (elements.qrIcon) elements.qrIcon.style.display = 'block';
-        
         if (elements.loadingIndicator) elements.loadingIndicator.style.display = 'none';
     }
 
-    // Добавлены обработчики для новых функций
+    // Вспышка
+    function flashFrame() {
+        if (elements.qrContainer) {
+            elements.qrContainer.classList.remove('flash');
+            setTimeout(() => elements.qrContainer.classList.add('flash'), 0);
+        }
+    }
+
+    // Обработчики событий для бокового меню
+    if (elements.sidebarToggle) {
+        elements.sidebarToggle.addEventListener('click', () => {
+            elements.sidebarMenu.style.display = elements.sidebarMenu.style.display === 'block' ? 'none' : 'block';
+        });
+    }
+
     if (elements.addDataButton) {
         elements.addDataButton.addEventListener('click', () => {
-            if (elements.rawDataInput) elements.rawDataInput.style.display = 'block';
-            if (elements.submitRawDataButton) elements.submitRawDataButton.style.display = 'block';
-            if (elements.statsContainer) elements.statsContainer.style.display = 'none';
+            elements.rawDataInput.style.display = 'block';
+            elements.submitRawDataButton.style.display = 'block';
+            elements.statsContainer.style.display = 'none';
         });
     }
 
@@ -388,31 +342,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 showMessage('error', 'Введите данные');
                 return;
             }
-            
             const { courierName, deliveryIds } = parseRawData(rawData);
             if (!courierName || deliveryIds.length === 0) {
                 showMessage('error', 'Неверный формат данных');
                 return;
             }
-            
             await saveCourierAndDeliveries(courierName, deliveryIds);
         });
     }
 
     if (elements.showStatsButton) {
         elements.showStatsButton.addEventListener('click', async () => {
-            if (elements.rawDataInput) elements.rawDataInput.style.display = 'none';
-            if (elements.submitRawDataButton) elements.submitRawDataButton.style.display = 'none';
-            if (elements.statsContainer) elements.statsContainer.style.display = 'block';
+            elements.rawDataInput.style.display = 'none';
+            elements.submitRawDataButton.style.display = 'none';
+            elements.statsContainer.style.display = 'block';
             await loadStats();
         });
-    }
-
-    // Улучшенная функция вспышки
-    function flashFrame() {
-        if (elements.qrContainer) {
-            elements.qrContainer.classList.remove('flash');
-            setTimeout(() => elements.qrContainer.classList.add('flash'), 0);
-        }
     }
 });
