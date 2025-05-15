@@ -1,7 +1,8 @@
+```javascript
 // main.js
 
 import { database } from './firebase.js';
-import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
+import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", function () {
     const resultDiv = document.getElementById('result');
@@ -36,6 +37,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const scanDelay = 2000;
     let isProcessing = false;
 
+    // Debugging logs to ensure elements are found
+    console.log('Input mode button:', inputModeButton);
+    console.log('Scan button:', scanButton);
+
     // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
         resultDiv.className = `scan-result ${status}`;
@@ -63,6 +68,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Обработчики событий
     if (inputModeButton) {
         inputModeButton.addEventListener('click', () => {
+            console.log('Input mode button clicked');
             inputModeButton.classList.add('active');
             manualSubmitButton.classList.add('active');
             inputModeButton.style.display = 'none';
@@ -70,10 +76,13 @@ document.addEventListener("DOMContentLoaded", function () {
             stopQrScanner();
             manualTransferIdInput.focus();
         });
+    } else {
+        console.error('Input mode button not found');
     }
 
     if (manualSubmitButton) {
         manualSubmitButton.addEventListener('click', () => {
+            console.log('Manual submit button clicked');
             const transferId = manualTransferIdInput.value.trim();
             if (/^\d{4}$/.test(transferId) || /^\d{10}$/.test(transferId)) {
                 processTransferId(transferId);
@@ -81,39 +90,56 @@ document.addEventListener("DOMContentLoaded", function () {
                 showMessage('error', 'Неверный формат ID', '', '', '');
             }
         });
+    } else {
+        console.error('Manual submit button not found');
     }
 
     if (manualTransferIdInput) {
         manualTransferIdInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') manualSubmitButton.click();
+            if (e.key === 'Enter') {
+                console.log('Enter key pressed in manual input');
+                manualSubmitButton.click();
+            }
         });
+    } else {
+        console.error('Manual transfer ID input not found');
     }
 
     if (scanButton) {
         scanButton.addEventListener('click', () => {
+            console.log('Scan button clicked');
             scanButton.classList.add('released');
             startQrScanner();
             setTimeout(() => scanButton.classList.remove('released'), 500);
         });
+    } else {
+        console.error('Scan button not found');
     }
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => {
+            console.log('Sidebar toggle clicked');
             sidebarMenu.style.display = sidebarMenu.style.display === 'block' ? 'none' : 'block';
         });
+    } else {
+        console.error('Sidebar toggle not found');
     }
 
     if (addDataButton) {
         addDataButton.addEventListener('click', async () => {
+            console.log('Add data button clicked');
             sidebarMenu.style.display = 'block';
             rawDataInput.style.display = 'block';
             submitRawDataButton.style.display = 'block';
             statsContainer.style.display = 'none';
         });
+    } else {
+        console.error('Add data button not found');
     }
 
     if (submitRawDataButton) {
         submitRawDataButton.addEventListener('click', async () => {
+            console.log('Submit raw data button clicked');
             const rawData = rawDataInput.value.trim();
             if (!rawData) {
                 showMessage('error', 'Введите данные', '', '', '');
@@ -133,15 +159,20 @@ document.addEventListener("DOMContentLoaded", function () {
             await saveCourierAndDeliveries(courierName, deliveryIds);
             rawDataInput.value = '';
         });
+    } else {
+        console.error('Submit raw data button not found');
     }
 
     if (showStatsButton) {
         showStatsButton.addEventListener('click', async () => {
+            console.log('Show stats button clicked');
             rawDataInput.style.display = 'none';
             submitRawDataButton.style.display = 'none';
             statsContainer.style.display = 'block';
             await loadStats();
         });
+    } else {
+        console.error('Show stats button not found');
     }
 
     // Функции
@@ -149,12 +180,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
-        // Извлекаем фамилию из первой строки, убираем всё после первого пробела или дефиса
         const firstLine = lines[0];
         const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
         const courierName = courierNameMatch ? courierNameMatch[0] : '';
 
-        // Извлекаем только 10-значные числа
         const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
 
         return { courierName, deliveryIds };
@@ -196,6 +225,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function startQrScanner() {
+        console.log('Starting QR scanner');
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
@@ -209,12 +239,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { exact: "environment" } // Приоритет задней камеры
+                    facingMode: { exact: "environment" }
                 }
             });
 
             videoElement.srcObject = stream;
             await videoElement.play();
+
+            qrContainer.querySelector('#qr-reader').classList.add('active');
 
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
@@ -222,6 +254,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
                 if (result) {
+                    console.log('QR code scanned:', result.getText());
                     onScanSuccess(result.getText());
                     codeReader.reset();
                     stopQrScanner();
@@ -233,7 +266,11 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         } catch (err) {
             console.error('Ошибка камеры:', err.name, err.message, err.constraint);
-            showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
+            if (err.name === 'NotAllowedError') {
+                showMessage('error', 'Доступ к камере заблокирован. Разрешите доступ в настройках браузера.', '', '', '');
+            } else {
+                showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
+            }
             qrIcon.style.display = 'block';
         }
     }
@@ -333,8 +370,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (scansSnapshot.exists()) {
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
-                    const li = document.createElement('li');
                     const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
+                    const li = document.createElement('li');
                     li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
                     statsList.appendChild(li);
                 });
@@ -352,13 +389,16 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function stopQrScanner() {
+        console.log('Stopping QR scanner');
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
             videoElement.srcObject = null;
         }
         if (codeReader) codeReader.reset();
+        qrContainer.querySelector('#qr-reader').classList.remove('active');
         qrIcon.style.display = 'block';
         loadingIndicator.style.display = 'none';
     }
 });
+```
