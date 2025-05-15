@@ -1,7 +1,7 @@
 // main.js
 
 import { database } from './firebase.js';
-import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
+import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", function () {
     const resultDiv = document.getElementById('result');
@@ -149,12 +149,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
-        // Извлекаем фамилию из первой строки, убираем всё после первого пробела или дефиса
         const firstLine = lines[0];
         const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
         const courierName = courierNameMatch ? courierNameMatch[0] : '';
 
-        // Извлекаем только 10-значные числа
         const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
 
         return { courierName, deliveryIds };
@@ -215,6 +213,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
             videoElement.srcObject = stream;
             await videoElement.play();
+
+            // Скрываем иконку при запуске сканера
+            qrIcon.style.display = 'none';
 
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
