@@ -1,7 +1,11 @@
 import { database } from './firebase.js';
-import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { ref, push, set, get, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", function () {
+    // Проверка загрузки DOM
+    console.log('DOM fully loaded');
+
+    // Выбор элементов DOM
     const resultDiv = document.getElementById('result');
     const resultTransferId = document.getElementById('resultTransferId');
     const resultCourier = document.getElementById('resultCourier');
@@ -28,29 +32,31 @@ document.addEventListener("DOMContentLoaded", function () {
     const statsList = document.getElementById('statsList');
     const rawDataInput = document.getElementById('rawData');
 
+    // Проверка наличия ключевых элементов
+    if (!qrIcon) console.error('qrIcon is null');
+    if (!loadingIndicator) console.error('loadingIndicator is null');
+    if (!videoElement) console.error('videoElement is null');
+    if (!resultDiv) console.error('resultDiv is null');
+
     let stream = null;
     let codeReader = null;
     let lastScanTime = 0;
     const scanDelay = 2000;
     let isProcessing = false;
 
-    // Показ сообщения
-    window.showMessage = function(status, message, courier, previousCourier, rawData) {
-        if (!resultDiv) return;
+    // Функция для показа сообщений
+    function showMessage(status, message, courier = '', previousCourier = '', rawData = '') {
+        if (!resultDiv) {
+            console.error('resultDiv is null');
+            return;
+        }
         resultDiv.className = `scan-result ${status}`;
-        let transferId = message;
-        const match = message.match(/\d{10}|\d{4}/);
-        if (match) transferId = match[0];
-
-        resultTransferId.textContent = transferId || '';
+        resultTransferId.textContent = message;
         resultCourier.textContent = courier ? `Курьер: ${courier}` : '';
-        resultPrevious.textContent = previousCourier || '';
-        resultStatus.textContent = status === 'already_scanned' ? 'Повторное сканирование' :
-                                 status === 'success' ? 'Успешно' :
-                                 status === 'not_found' ? 'Не найдено' : message;
+        resultPrevious.textContent = previousCourier ? `Предыдущий курьер: ${previousCourier}` : '';
+        resultStatus.textContent = status;
         resultRawData.textContent = rawData ? `Сырые данные: ${rawData}` : '';
         resultDiv.style.display = 'flex';
-
         setTimeout(() => {
             resultDiv.style.display = 'none';
             if (status === 'success' || status === 'already_scanned') {
@@ -62,11 +68,10 @@ document.addEventListener("DOMContentLoaded", function () {
     // Обработчики событий
     if (inputModeButton) {
         inputModeButton.addEventListener('click', () => {
-            inputModeButton.classList.add('active');
-            manualSubmitButton.classList.add('active');
-            inputModeButton.style.display = 'none';
+            console.log('Input mode button clicked');
             manualInputContainer.style.display = 'flex';
             stopQrScanner();
+            inputModeButton.style.display = 'none';
             manualTransferIdInput.focus();
         });
     }
@@ -77,22 +82,15 @@ document.addEventListener("DOMContentLoaded", function () {
             if (/^\d{4}$/.test(transferId) || /^\d{10}$/.test(transferId)) {
                 processTransferId(transferId);
             } else {
-                showMessage('error', 'Неверный формат ID', '', '', '');
+                showMessage('error', 'Неверный формат ID');
             }
-        });
-    }
-
-    if (manualTransferIdInput) {
-        manualTransferIdInput.addEventListener('keypress', e => {
-            if (e.key === 'Enter') manualSubmitButton.click();
         });
     }
 
     if (scanButton) {
         scanButton.addEventListener('click', () => {
-            scanButton.classList.add('released');
+            console.log('Scan button clicked');
             startQrScanner();
-            setTimeout(() => scanButton.classList.remove('released'), 500);
         });
     }
 
@@ -103,8 +101,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     if (addDataButton) {
-        addDataButton.addEventListener('click', async () => {
-            sidebarMenu.style.display = 'block';
+        addDataButton.addEventListener('click', () => {
             rawDataInput.style.display = 'block';
             submitRawDataButton.style.display = 'block';
             statsContainer.style.display = 'none';
@@ -115,20 +112,14 @@ document.addEventListener("DOMContentLoaded", function () {
         submitRawDataButton.addEventListener('click', async () => {
             const rawData = rawDataInput.value.trim();
             if (!rawData) {
-                showMessage('error', 'Введите данные', '', '', '');
+                showMessage('error', 'Введите данные');
                 return;
             }
-
             const { courierName, deliveryIds } = parseRawData(rawData);
-            if (!courierName) {
-                showMessage('error', 'Не найдено имя курьера', '', '', '');
+            if (!courierName || deliveryIds.length === 0) {
+                showMessage('error', 'Неверный формат данных');
                 return;
             }
-            if (deliveryIds.length === 0) {
-                showMessage('error', 'Не найдены номера передач', '', '', '');
-                return;
-            }
-
             await saveCourierAndDeliveries(courierName, deliveryIds);
             rawDataInput.value = '';
         });
@@ -143,96 +134,62 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Функции
+    // Вспомогательные функции
     function parseRawData(text) {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
-
-        const firstLine = lines[0];
-        const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
-        const courierName = courierNameMatch ? courierNameMatch[0] : '';
-
-        const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
-
+        const courierName = lines[0].match(/^[А-Яа-яA-Za-z]+/)?.[0] || '';
+        const deliveryIds = lines.slice(1).filter(line => /^\d{10}$/.test(line));
         return { courierName, deliveryIds };
     }
 
     async function saveCourierAndDeliveries(courierName, deliveryIds) {
-        if (!courierName || deliveryIds.length === 0) {
-            showMessage('error', 'Нет данных для сохранения', '', '', '');
-            return;
-        }
-
         try {
             const couriersRef = ref(database, 'couriers');
-            const deliveriesRef = ref(database, 'deliveries');
-
             const newCourierRef = push(couriersRef);
-            await set(newCourierRef, {
-                name: courierName,
-                timestamp: Date.now()
-            });
-
+            await set(newCourierRef, { name: courierName, timestamp: Date.now() });
             const courierId = newCourierRef.key;
-
+            const deliveriesRef = ref(database, 'deliveries');
             for (const id of deliveryIds) {
                 const newDeliveryRef = push(deliveriesRef);
-                await set(newDeliveryRef, {
-                    id,
-                    courier_id: courierId,
-                    courier_name: courierName,
-                    timestamp: Date.now()
-                });
+                await set(newDeliveryRef, { id, courier_id: courierId, courier_name: courierName, timestamp: Date.now() });
             }
-
-            showMessage('success', '', `Добавлен курьер: ${courierName}`, `Передач: ${deliveryIds.length}`);
+            showMessage('success', 'Данные сохранены');
         } catch (e) {
-            console.error("Ошибка сохранения в Firebase: ", e);
-            showMessage('error', 'Ошибка при сохранении', '', '', '');
+            console.error('Ошибка сохранения:', e);
+            showMessage('error', 'Ошибка сохранения');
         }
     }
 
     async function startQrScanner() {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = devices.filter(device => device.kind === 'videoinput');
-            const camera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0] || null;
-
+            const camera = devices.find(device => device.kind === 'videoinput' && device.label.toLowerCase().includes('back')) || devices.find(device => device.kind === 'videoinput');
             if (!camera) {
-                showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
+                showMessage('error', 'Камера не найдена');
                 if (qrIcon) qrIcon.style.display = 'block';
                 return;
             }
-
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { exact: "environment" }
-                }
-            });
-
-            videoElement.srcObject = stream;
-            await videoElement.play();
-
-            if (qrIcon) qrIcon.style.display = 'none';
-
-            if (!codeReader) {
-                codeReader = new ZXing.BrowserMultiFormatReader();
+            stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: camera.deviceId } });
+            if (videoElement) {
+                videoElement.srcObject = stream;
+                await videoElement.play();
             }
-
+            if (qrIcon) qrIcon.style.display = 'none';
+            codeReader = new ZXing.BrowserMultiFormatReader();
             codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
                 if (result) {
-                    onScanSuccess(result.getText());
+                    onScanSuccess(result.text);
                     codeReader.reset();
                     stopQrScanner();
                 }
                 if (err && !(err instanceof ZXing.NotFoundException)) {
                     console.error('Ошибка сканирования:', err);
-                    showMessage('error', 'Ошибка сканирования QR', '', '', '');
                 }
             });
         } catch (err) {
-            console.error('Ошибка камеры:', err.name, err.message, err.constraint);
-            showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
+            console.error('Ошибка камеры:', err);
+            showMessage('error', 'Ошибка камеры');
             if (qrIcon) qrIcon.style.display = 'block';
         }
     }
@@ -241,56 +198,44 @@ document.addEventListener("DOMContentLoaded", function () {
         const now = Date.now();
         if (now - lastScanTime < scanDelay) return;
         lastScanTime = now;
-
         navigator.vibrate?.(200);
         flashFrame();
         processTransferId(decodedText);
     }
 
     function flashFrame() {
-        qrContainer.classList.remove('flash');
-        setTimeout(() => qrContainer.classList.add('flash'), 0);
+        if (qrContainer) {
+            qrContainer.classList.remove('flash');
+            setTimeout(() => qrContainer.classList.add('flash'), 0);
+        }
     }
 
     async function processTransferId(transferId) {
         if (isProcessing) return;
         isProcessing = true;
-        loadingIndicator.style.display = 'block';
-
+        if (loadingIndicator) loadingIndicator.style.display = 'block';
         try {
             const cleanedId = transferId.replace(/[^\d]/g, '');
-
             if (cleanedId.length !== 4 && cleanedId.length !== 10) {
-                showMessage('error', 'Неверный формат ID', '', '', '');
-                isProcessing = false;
+                showMessage('error', 'Неверный формат ID');
                 return;
             }
-
-            const deliveriesQuery = query(ref(database, 'deliveries'));
-            const snapshot = await get(deliveriesQuery);
-
+            const deliveriesRef = ref(database, 'deliveries');
+            const snapshot = await get(query(deliveriesRef));
             let found = false;
             let courierName = '';
-            let courierId = '';
-
-            if (snapshot.exists()) {
-                snapshot.forEach(childSnapshot => {
-                    const data = childSnapshot.val();
-                    if (data.id === cleanedId) {
-                        courierName = data.courier_name;
-                        courierId = data.courier_id;
-                        found = true;
-                    }
-                });
-            }
-
+            snapshot.forEach(childSnapshot => {
+                const data = childSnapshot.val();
+                if (data.id === cleanedId) {
+                    courierName = data.courier_name;
+                    found = true;
+                }
+            });
             if (found) {
                 const scansRef = ref(database, 'scans');
-                const scansQuery = query(scansRef);
-                const scansSnapshot = await get(scansQuery);
+                const scansSnapshot = await get(query(scansRef));
                 let duplicate = false;
                 let prevCourier = '';
-
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
                     if (scanData.delivery_id === cleanedId) {
@@ -298,16 +243,11 @@ document.addEventListener("DOMContentLoaded", function () {
                         prevCourier = scanData.courier_name;
                     }
                 });
-
                 if (duplicate) {
                     showMessage('already_scanned', cleanedId, courierName, `Ранее сканировал: ${prevCourier}`);
                 } else {
-                    const scansRef = push(ref(database, 'scans'));
-                    await set(scansRef, {
-                        delivery_id: cleanedId,
-                        courier_name: courierName,
-                        timestamp: Date.now()
-                    });
+                    const newScanRef = push(scansRef);
+                    await set(newScanRef, { delivery_id: cleanedId, courier_name: courierName, timestamp: Date.now() });
                     showMessage('success', cleanedId, courierName);
                 }
             } else {
@@ -315,10 +255,10 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         } catch (e) {
             console.error('Ошибка поиска:', e);
-            showMessage('error', 'Ошибка при поиске', '', '', '');
+            showMessage('error', 'Ошибка при поиске');
         } finally {
-            loadingIndicator.style.display = 'none';
             isProcessing = false;
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
         }
     }
 
@@ -326,12 +266,10 @@ document.addEventListener("DOMContentLoaded", function () {
         statsList.innerHTML = '';
         try {
             const scansRef = ref(database, 'scans');
-            const scansQuery = query(scansRef);
-            const scansSnapshot = await get(scansQuery);
-
-            if (scansSnapshot.exists()) {
-                scansSnapshot.forEach(scanSnap => {
-                    const scanData = scanSnap.val();
+            const snapshot = await get(query(scansRef));
+            if (snapshot.exists()) {
+                snapshot.forEach(childSnapshot => {
+                    const scanData = childSnapshot.val();
                     const li = document.createElement('li');
                     const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
                     li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
@@ -354,10 +292,10 @@ document.addEventListener("DOMContentLoaded", function () {
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
             stream = null;
-            videoElement.srcObject = null;
+            if (videoElement) videoElement.srcObject = null;
         }
         if (codeReader) codeReader.reset();
         if (qrIcon) qrIcon.style.display = 'block';
-        loadingIndicator.style.display = 'none';
+        if (loadingIndicator) loadingIndicator.style.display = 'none';
     }
 });
