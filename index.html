@@ -1,56 +1,50 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <base target="_top">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-    <title>QR Сканер</title>
-    <script src="https://unpkg.com/ @zxing/library@latest/umd/index.min.js" type="text/javascript"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter :wght@400;500&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Сканер QR кодов</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js"></script>
 </head>
 <body>
-    <button class="sidebar-button" id="sidebarToggle" aria-label="Открыть меню">☰</button>
-
-    <!-- Основной контент -->
     <div class="page">
-        <div class="button-group" id="controlGroup">
-            <button class="button-group-item" id="inputModeButton" aria-label="Переключиться на ручной ввод ID">ID передачи</button>
-            <div class="button-group-item" id="manualInputContainer">
-                <input type="text" id="manualTransferId" placeholder="10 или 4 цифры ID" aria-label="Ввести ID передачи">
-                <button class="button-group-item" id="manualSubmitButton" aria-label="Отправить ID">Отправить</button>
+        <button id="sidebarToggle" class="sidebar-button">☰</button>
+        <div id="sidebarMenu" class="sidebar-menu">
+            <button id="addDataButton">📥 Добавить данные</button>
+            <textarea id="rawData"></textarea>
+            <button id="showStatsButton">📊 Показать статистику</button>
+        </div>
+
+        <div class="button-group">
+            <button id="inputModeButton" class="button-group-item">ID передачи</button>
+            <div id="manualInputContainer">
+                <input type="text" id="manualTransferId" placeholder="Введите ID">
+                <button id="manualSubmitButton" class="button-group-item">Отправить</button>
             </div>
+        </div>
+
+        <div class="scan-result" id="result">
+            <span id="resultTransferId" class="transfer-id"></span>
+            <span id="resultCourier" class="courier-name"></span>
+            <span id="resultPrevious" class="previous-courier"></span>
+            <span id="resultStatus" class="status"></span>
+            <span id="resultRawData" class="raw-data"></span>
         </div>
 
         <div class="qr-container">
             <div id="qr-reader">
-                <video id="qr-video" playsinline muted></video>
+                <video id="qr-video" autoplay playsinline muted style="width: 100%; height: 100%;"></video>
+                <img class="qr-icon" src="./assets/qr-icon.svg" alt="QR Icon">
+                <div id="loadingIndicator" class="loading-indicator">Сканирование...</div>
             </div>
-            <svg class="qr-icon" width="80px" height="80px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 12H12V17M3.01 12H3M8.01 17H8M12.01 21H12M21.01 12H21M3 17H4.5M15.5 12H17.5M3 21H8M12 2V8M17.6 21H19.4C19.9601 21 20.2401 21 20.454 20.891C20.6422 20.7951 20.7951 20.6422 20.891 20.454C21 20.2401 21 19.9601 21 19.4V17.6C21 17.0399 21 16.7599 20.891 16.546C20.7951 16.3578 20.6422 16.2049 20.454 16.109C20.2401 16 19.9601 16 19.4 16H17.6C17.0399 16 16.7599 16 16.546 16.109C16.3578 16.2049 16.2049 16.3578 16.109 16.546C16 16.7599 16 17.0399 16 17.6V19.4C16 19.9601 16 20.2401 16.109 20.454C16.2049 20.6422 16.3578 20.7951 16.546 20.891C16.7599 21 17.0399 21 17.6 21ZM17.6 8H19.4C19.9601 8 20.2401 8 20.454 7.89101C20.6422 7.79513 20.7951 7.64215 20.891 7.45399C21 7.24008 21 6.96005 21 6.4V4.6C21 4.03995 21 3.75992 20.891 3.54601C20.7951 3.35785 20.6422 3.20487 20.454 3.10899C20.2401 3 19.9601 3 19.4 3H17.6C17.0399 3 16.7599 3 16.546 3.10899C16.3578 3.20487 16.2049 3.35785 16.109 3.54601C16 3.75992 16 4.03995 16 4.6V6.4C16 6.96005 16 7.24008 16.109 7.45399C16.2049 7.64215 16.3578 7.79513 16.546 7.89101C16.7599 8 17.0399 8 17.6 8ZM4.6 8H6.4C6.96005 8 7.24008 8 7.45399 7.89101C7.64215 7.79513 7.79513 7.64215 7.89101 7.45399C8 7.24008 8 6.96005 8 6.4V4.6C8 4.03995 8 3.75992 7.89101 3.54601C7.79513 3.35785 7.64215 3.20487 7.45399 3.10899C7.24008 3 6.96005 3 6.4 3H4.6C4.03995 3 3.75992 3 3.54601 3.10899C3.35785 3.20487 3.20487 3.35785 3.10899 3.54601C3 3.75992 3 4.03995 3 4.6V6.4C3 6.96005 3 7.24008 3.10899 7.45399C3.20487 7.64215 3.35785 7.79513 3.54601 7.89101C3.75992 8 4.03995 8 4.6 8Z" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <div class="loading-indicator" id="loadingIndicator">Сканирование...</div>
         </div>
 
-        <div id="result" class="scan-result">
-            <div class="transfer-id" id="resultTransferId"></div>
-            <div class="courier-name" id="resultCourier"></div>
-            <div class="previous-courier" id="resultPrevious"></div>
-            <div class="status" id="resultStatus"></div>
-            <div class="raw-data" id="resultRawData"></div>
-        </div>
-
-        <button class="scan-button" id="scanButton" aria-label="Сканировать QR-код">Сканировать QR код</button>
-        <p class="info-text">Сканируйте QR передачи или введите ID вручную</p>
+        <button id="scanButton" class="scan-button">Сканировать QR код</button>
+        <div class="info-text">Сканируйте QR передачи или введите ID вручную</div>
     </div>
 
-    <!-- Сайдбар -->
-    <div class="sidebar-menu" id="sidebarMenu">
-        <h3>Добавить данные</h3>
-        <textarea id="rawData" placeholder="Агаев&#10;Доставлено&#10;70&#10;3763009542"></textarea>
-        <button id="addDataButton">📥 Добавить данные</button>
-    </div>
-
-    <script type="module" src="./main.js"></script>
+    <script type="module" src="firebase.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
