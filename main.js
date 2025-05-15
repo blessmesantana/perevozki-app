@@ -1,5 +1,4 @@
 // main.js
-
 import { database } from './firebase.js';
 import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
 
