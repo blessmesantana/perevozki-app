@@ -1,3 +1,5 @@
+/* styles.css */
+
 * {
     margin: 0;
     padding: 0;
@@ -231,6 +233,12 @@ html {
     min-height: 60px;
     overflow-wrap: break-word;
     white-space: normal;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.scan-result.show {
+    opacity: 1;
 }
 
 .scan-result.success {
