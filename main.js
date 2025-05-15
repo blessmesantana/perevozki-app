@@ -1,7 +1,7 @@
 // main.js
 
 import { database } from './firebase.js';
-import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
+import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", function () {
     const resultDiv = document.getElementById('result');
@@ -149,12 +149,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
-        // Извлекаем фамилию из первой строки, убираем всё после первого пробела или дефиса
         const firstLine = lines[0];
         const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
         const courierName = courierNameMatch ? courierNameMatch[0] : '';
 
-        // Извлекаем только 10-значные числа
         const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
 
         return { courierName, deliveryIds };
@@ -197,30 +195,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function startQrScanner() {
         try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = devices.filter(device => device.kind === 'videoinput');
-            const camera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0] || null;
-
-            if (!camera) {
-                showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
-                qrIcon.style.display = 'block';
-                return;
-            }
-
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { exact: "environment" } // Приоритет задней камеры
+            // Попытка получить заднюю камеру с facingMode: "environment"
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { exact: "environment" } }
+                });
+                console.log('Используется задняя камера с facingMode: "environment"');
+            } catch (err) {
+                console.log('facingMode: "environment" не сработал, ищем камеру с "back" в названии');
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(device => device.kind === 'videoinput');
+                const backCamera = cameras.find(c => c.label.toLowerCase().includes('back'));
+                if (backCamera) {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: { exact: backCamera.deviceId } }
+                    });
+                    console.log('Используется задняя камера по названию');
+                } else if (cameras.length > 0) {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { deviceId: { exact: cameras[0].deviceId } }
+                    });
+                    console.log('Используется первая доступная камера');
+                } else {
+                    throw new Error('Камеры не найдены на устройстве');
                 }
-            });
+            }
 
             videoElement.srcObject = stream;
             await videoElement.play();
+            qrIcon.style.display = 'none'; // Скрываем SVG-иконку при запуске
 
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
 
-            codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
+            codeReader.decodeFromVideoDevice(undefined, 'qr-video', (result, err) => {
                 if (result) {
                     onScanSuccess(result.getText());
                     codeReader.reset();
@@ -232,7 +241,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             });
         } catch (err) {
-            console.error('Ошибка камеры:', err.name, err.message, err.constraint);
+            console.error('Ошибка камеры:', err.name, err.message);
             showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
             qrIcon.style.display = 'block';
         }
@@ -358,7 +367,7 @@ document.addEventListener("DOMContentLoaded", function () {
             videoElement.srcObject = null;
         }
         if (codeReader) codeReader.reset();
-        qrIcon.style.display = 'block';
+        qrIcon.style.display = 'block'; // Показываем SVG-иконку
         loadingIndicator.style.display = 'none';
     }
 });
