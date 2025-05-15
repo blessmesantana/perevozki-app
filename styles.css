@@ -3,10 +3,10 @@
     padding: 0;
     box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
-  }
-  
-  body,
-  html {
+}
+
+body,
+html {
     height: 100dvh;
     width: 100%;
     font-family: 'Inter', sans-serif;
@@ -14,9 +14,9 @@
     color: white;
     overflow: hidden;
     touch-action: manipulation;
-  }
-  
-  .page {
+}
+
+.page {
     width: 100%;
     height: 100dvh;
     max-width: 582px;
@@ -27,9 +27,9 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-  }
-  
-  .button-group {
+}
+
+.button-group {
     width: 100%;
     height: 40px;
     padding: 2px;
@@ -38,9 +38,9 @@
     border-radius: 20px;
     overflow: hidden;
     margin-bottom: 20px;
-  }
-  
-  .button-group-item {
+}
+
+.button-group-item {
     flex: 1;
     height: 36px;
     display: flex;
@@ -53,44 +53,44 @@
     cursor: pointer;
     transition: background 0.5s ease, color 0.5s ease, transform 0.5s ease;
     border: none;
-  }
-  
-  #inputModeButton {
+}
+
+#inputModeButton {
     color: #5A6AD2;
     background: #FFFFFF;
-  }
-  
-  #manualSubmitButton {
+}
+
+#manualSubmitButton {
     color: #2D3DA5;
     background: #C4CAEF;
     width: 100px;
     opacity: 0;
     transform: translateX(20px);
     transition: opacity 0.5s ease, transform 0.5s ease;
-  }
-  
-  #inputModeButton.active {
+}
+
+#inputModeButton.active {
     transform: translateX(-50%);
-  }
-  
-  #manualSubmitButton.active {
+}
+
+#manualSubmitButton.active {
     opacity: 1;
     transform: translateX(0);
-  }
-  
-  #inputModeButton:hover,
-  #manualSubmitButton:hover {
+}
+
+#inputModeButton:hover,
+#manualSubmitButton:hover {
     color: #ffffff;
     background: #a0a9e5;
-  }
-  
-  #inputModeButton:active,
-  #manualSubmitButton:active {
+}
+
+#inputModeButton:active,
+#manualSubmitButton:active {
     color: #5a6ad2;
     background: #ffffff;
-  }
-  
-  #manualTransferId {
+}
+
+#manualTransferId {
     flex: 1;
     height: 36px;
     padding: 0 15px;
@@ -101,15 +101,15 @@
     font-size: 14px;
     min-width: 120px;
     outline: none;
-  }
-  
-  #manualInputContainer {
+}
+
+#manualInputContainer {
     display: none;
     flex: 1;
     gap: 6px;
-  }
-  
-  .qr-container {
+}
+
+.qr-container {
     width: 260px;
     height: 260px;
     display: flex;
@@ -121,24 +121,24 @@
     margin: 20px 0;
     position: relative;
     --frame-color: #ea1e63;
-  }
-  
-  #qr-reader {
+}
+
+#qr-reader {
     width: 100%;
     height: 100%;
     border: none;
     border-radius: 20px;
     overflow: hidden;
-  }
-  
-  #qr-reader video {
+}
+
+#qr-reader video {
     width: 100%;
     height: 100%;
     object-fit: fill;
     border-radius: 20px;
-  }
-  
-  .qr-container::before {
+}
+
+.qr-container::before {
     content: '';
     position: absolute;
     width: 200px;
@@ -150,43 +150,41 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-  }
-  
-  @keyframes flash {
+}
+
+@keyframes flash {
     0% {
-      border-color: #4caf50;
-      opacity: 1;
-      border-width: 4px;
+        border-color: #4caf50;
+        opacity: 1;
+        border-width: 4px;
     }
-  
     50% {
-      border-color: #4caf50;
-      opacity: 0.5;
-      border-width: 2px;
+        border-color: #4caf50;
+        opacity: 0.5;
+        border-width: 2px;
     }
-  
     100% {
-      border-color: #ea1e63;
-      opacity: 1;
-      border-width: 2px;
+        border-color: #ea1e63;
+        opacity: 1;
+        border-width: 2px;
     }
-  }
-  
-  .qr-container.flash::before {
+}
+
+.qr-container.flash::before {
     animation: flash 0.8s ease;
-  }
-  
-  @media (prefers-reduced-motion: reduce) {
+}
+
+@media (prefers-reduced-motion: reduce) {
     .button-group-item,
     .qr-container::before,
     #manualSubmitButton,
     #inputModeButton {
-      transition: none;
-      animation: none;
+        transition: none;
+        animation: none;
     }
-  }
-  
-  .qr-icon {
+}
+
+.qr-icon {
     position: absolute;
     width: 80px;
     height: 80px;
@@ -195,13 +193,13 @@
     transform: translate(-50%, -50%);
     z-index: 11;
     pointer-events: none;
-  }
-  
-  #qr-reader:not(:empty) + .qr-icon {
+}
+
+#qr-reader:not(:empty) + .qr-icon {
     display: none;
-  }
-  
-  .loading-indicator {
+}
+
+.loading-indicator {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -214,9 +212,9 @@
     border-radius: 12px;
     display: none;
     z-index: 12;
-  }
-  
-  .scan-result {
+}
+
+.scan-result {
     width: 226px;
     border-radius: 28px;
     display: none;
@@ -231,65 +229,65 @@
     min-height: 60px;
     overflow-wrap: break-word;
     white-space: normal;
-  }
-  
-  .scan-result.success {
+}
+
+.scan-result.success {
     background: #4caf50;
     border-color: #388e3c;
-  }
-  
-  .scan-result.already_scanned {
+}
+
+.scan-result.already_scanned {
     background: #ffc107;
     border-color: #ffc107;
     color: #000;
-  }
-  
-  .scan-result.not_found,
-  .scan-result.error {
+}
+
+.scan-result.not_found,
+.scan-result.error {
     background: #ea1e63;
     border-color: #d32f2f;
-  }
-  
-  .transfer-id {
+}
+
+.transfer-id {
     font-size: 10px;
     margin-bottom: 2px;
     width: 100%;
     overflow-wrap: break-word;
-  }
-  
-  .courier-name {
+}
+
+.courier-name {
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 2px;
     width: 100%;
     overflow-wrap: break-word;
-  }
-  
-  .previous-courier {
+}
+
+.previous-courier {
     font-size: 12px;
     opacity: 0.8;
     margin-top: 2px;
     width: 100%;
     overflow-wrap: break-word;
-  }
-  
-  .status {
+}
+
+.status {
     font-size: 11px;
     font-weight: bold;
     margin-top: 2px;
     width: 100%;
     overflow-wrap: break-word;
-  }
-  
-  .raw-data {
+}
+
+.raw-data {
     font-size: 9px;
     opacity: 0.7;
     margin-top: 4px;
     width: 100%;
     overflow-wrap: break-word;
-  }
-  
-  .scan-button {
+}
+
+.scan-button {
     width: 293px;
     height: 55px;
     background: #ea1e63;
@@ -301,26 +299,26 @@
     margin: 20px 0;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     transition: background 0.3s ease;
-  }
-  
-  .scan-button:active {
+}
+
+.scan-button:active {
     background: #c2185b;
-  }
-  
-  .scan-button.released {
+}
+
+.scan-button.released {
     background: #ea1e63 !important;
-  }
-  
-  .info-text {
+}
+
+.info-text {
     font-size: 11px;
     color: #aeb5e4;
     text-align: center;
     width: 100%;
     padding: 0 20px;
     margin-top: 10px;
-  }
-  
-  .sidebar-button {
+}
+
+.sidebar-button {
     position: absolute;
     top: 10px;
     right: 10px;
@@ -330,9 +328,9 @@
     color: white;
     cursor: pointer;
     z-index: 1001;
-  }
-  
-  .sidebar-menu {
+}
+
+.sidebar-menu {
     position: absolute;
     top: 50px;
     right: 10px;
@@ -342,9 +340,9 @@
     display: none;
     z-index: 1000;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  }
-  
-  .sidebar-menu button {
+}
+
+.sidebar-menu button {
     background: none;
     border: none;
     color: white;
@@ -353,13 +351,13 @@
     width: 100%;
     font-size: 14px;
     cursor: pointer;
-  }
-  
-  .sidebar-menu button:hover {
+}
+
+.sidebar-menu button:hover {
     background: #3f51b5;
-  }
-  
-  #rawData {
+}
+
+#rawData {
     width: 100%;
     height: 150px;
     resize: none;
@@ -372,70 +370,70 @@
     background: white;
     color: black;
     font-size: 14px;
-  }
-  
-  @media (max-width: 360px) {
+}
+
+@media (max-width: 360px) {
     .button-group {
-      width: calc(100% - 30px);
+        width: calc(100% - 30px);
     }
-  
+
     #manualSubmitButton {
-      width: 90px;
-      font-size: 13px;
+        width: 90px;
+        font-size: 13px;
     }
-  
+
     #manualTransferId {
-      font-size: 13px;
-      padding: 0 10px;
+        font-size: 13px;
+        padding: 0 10px;
     }
-  
+
     .qr-container {
-      width: 220px;
-      height: 220px;
+        width: 220px;
+        height: 220px;
     }
-  
+
     .qr-container::before {
-      width: 160px;
-      height: 160px;
+        width: 160px;
+        height: 160px;
     }
-  
+
     .qr-icon {
-      width: 60px;
-      height: 60px;
+        width: 60px;
+        height: 60px;
     }
-  
+
     .scan-button {
-      width: 260px;
+        width: 260px;
     }
-  
+
     .scan-result {
-      width: 200px;
-      padding: 10px;
-      min-height: 50px;
+        width: 200px;
+        padding: 10px;
+        min-height: 50px;
     }
-  
+
     .transfer-id {
-      font-size: 9px;
-      margin-bottom: 1px;
+        font-size: 9px;
+        margin-bottom: 1px;
     }
-  
+
     .courier-name {
-      font-size: 13px;
-      margin-bottom: 1px;
+        font-size: 13px;
+        margin-bottom: 1px;
     }
-  
+
     .previous-courier {
-      font-size: 11px;
-      margin-top: 1px;
+        font-size: 11px;
+        margin-top: 1px;
     }
-  
+
     .status {
-      font-size: 10px;
-      margin-top: 1px;
+        font-size: 10px;
+        margin-top: 1px;
     }
-  
+
     .raw-data {
-      font-size: 8px;
-      margin-top: 2px;
+        font-size: 8px;
+        margin-top: 2px;
     }
-  }
+}
