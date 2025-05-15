@@ -35,11 +35,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const scanDelay = 2000;
     let isProcessing = false;
 
-    let deliveriesCache = {};
-    let couriersCache = {};
-
     // Показ сообщения
-    window.showMessage = function (status, message, courier, previousCourier, rawData) {
+    window.showMessage = function(status, message, courier, previousCourier, rawData) {
         resultDiv.className = `scan-result ${status}`;
         let transferId = message;
         const match = message.match(/\d{10}|\d{4}/);
@@ -49,13 +46,13 @@ document.addEventListener("DOMContentLoaded", function () {
         resultCourier.textContent = courier ? `Курьер: ${courier}` : '';
         resultPrevious.textContent = previousCourier || '';
         resultStatus.textContent = status === 'already_scanned' ? 'Повторное сканирование' :
-            status === 'success' ? 'Успешно' :
-            status === 'not_found' ? 'Не найдено' : message;
+                                 status === 'success' ? 'Успешно' :
+                                 status === 'not_found' ? 'Не найдено' : message;
         resultRawData.textContent = rawData ? `Сырые данные: ${rawData}` : '';
-        resultDiv.classList.add('show');
+        resultDiv.style.display = 'flex';
 
         setTimeout(() => {
-            resultDiv.classList.remove('show');
+            resultDiv.style.display = 'none';
             if (status === 'success' || status === 'already_scanned') {
                 startQrScanner();
             }
@@ -197,25 +194,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    async function initializeData() {
-        try {
-            const deliveriesSnapshot = await get(ref(database, 'deliveries'));
-            if (deliveriesSnapshot.exists()) {
-                deliveriesCache = deliveriesSnapshot.val();
-            }
-
-            const couriersSnapshot = await get(ref(database, 'couriers'));
-            if (couriersSnapshot.exists()) {
-                couriersCache = couriersSnapshot.val();
-            }
-
-            console.log("Данные о доставках и курьерах загружены и кэшированы.");
-        } catch (error) {
-            console.error("Ошибка при загрузке данных:", error);
-            showMessage("Ошибка при загрузке данных. Пожалуйста, попробуйте позже.", true);
-        }
-    }
-
     async function startQrScanner() {
         try {
             const devices = await navigator.mediaDevices.enumerateDevices();
@@ -266,12 +244,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
         navigator.vibrate?.(200);
         flashFrame();
-        processTransferId(decodedText); // Вызываем processTransferId с результатом сканирования
+        processTransferId(decodedText);
     }
 
     function flashFrame() {
-        qrContainer.classList.add('flash');
-        setTimeout(() => qrContainer.classList.remove('flash'), 300);
+        qrContainer.classList.remove('flash');
+        setTimeout(() => qrContainer.classList.add('flash'), 0);
     }
 
     async function processTransferId(transferId) {
@@ -280,44 +258,60 @@ document.addEventListener("DOMContentLoaded", function () {
         loadingIndicator.style.display = 'block';
 
         try {
-            const cleanedId = transferId.replace(/\D/g, '');
+            const cleanedId = transferId.replace(/[^\d]/g, '');
 
-            // Получаем данные из кэша
-            const delivery = deliveriesCache[cleanedId];
-            const courier = couriersCache[delivery ? delivery.courier_id : null];
+            if (cleanedId.length !== 4 && cleanedId.length !== 10) {
+                showMessage('error', 'Неверный формат ID', '', '', '');
+                isProcessing = false;
+                return;
+            }
 
-            if (delivery) {
-                // Отображаем данные из кэша
-                resultTransferId.textContent = `ID передачи: ${cleanedId}`;
-                resultCourier.textContent = `Курьер: ${courier ? courier.courier_name : 'Не назначен'}`;
-                resultPrevious.textContent = `Предыдущее местоположение: ${delivery.previous_location || 'Неизвестно'}`;
-                resultStatus.textContent = `Статус: ${delivery.status}`;
-                resultRawData.textContent = JSON.stringify(delivery, null, 2);
+            const deliveriesQuery = query(ref(database, 'deliveries'));
+            const snapshot = await get(deliveriesQuery);
 
-                flashFrame(qrContainer, 'green-border');
+            let found = false;
+            let courierName = '';
+            let courierId = '';
 
-                // Записываем информацию о сканировании в БД
-                try {
-                    const scansRef = ref(database, 'scans');
-                    await push(scansRef, {
+            if (snapshot.exists()) {
+                snapshot.forEach(childSnapshot => {
+                    const data = childSnapshot.val();
+                    if (data.id === cleanedId) {
+                        courierName = data.courier_name;
+                        courierId = data.courier_id;
+                        found = true;
+                    }
+                });
+            }
+
+            if (found) {
+                const scansRef = ref(database, 'scans');
+                const scansQuery = query(scansRef);
+                const scansSnapshot = await get(scansQuery);
+                let duplicate = false;
+                let prevCourier = '';
+
+                scansSnapshot.forEach(scanSnap => {
+                    const scanData = scanSnap.val();
+                    if (scanData.delivery_id === cleanedId) {
+                        duplicate = true;
+                        prevCourier = scanData.courier_name;
+                    }
+                });
+
+                if (duplicate) {
+                    showMessage('already_scanned', cleanedId, courierName, `Ранее сканировал: ${prevCourier}`);
+                } else {
+                    const scansRef = push(ref(database, 'scans'));
+                    await set(scansRef, {
                         delivery_id: cleanedId,
-                        courier_name: courier ? courier.courier_name : 'Не назначен',
+                        courier_name: courierName,
                         timestamp: Date.now()
                     });
-                    console.log("Информация о сканировании сохранена.");
-                } catch (e) {
-                    console.error("Ошибка при сохранении информации о сканировании:", e);
-                    showMessage("Ошибка при сохранении информации о сканировании.", true);
+                    showMessage('success', cleanedId, courierName);
                 }
-
             } else {
-                // Отображаем сообщение, что не найдено
-                resultTransferId.textContent = `ID передачи: ${cleanedId} не найден`;
-                resultCourier.textContent = '';
-                resultPrevious.textContent = '';
-                resultStatus.textContent = '';
-                resultRawData.textContent = '';
-                flashFrame(qrContainer, 'red-border');
+                showMessage('not_found', cleanedId);
             }
         } catch (e) {
             console.error('Ошибка поиска:', e);
@@ -329,26 +323,20 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function loadStats() {
-        // Очищаем список более эффективно
-        while (statsList.firstChild) {
-            statsList.removeChild(statsList.firstChild);
-        }
-
+        statsList.innerHTML = '';
         try {
             const scansRef = ref(database, 'scans');
             const scansQuery = query(scansRef);
             const scansSnapshot = await get(scansQuery);
 
             if (scansSnapshot.exists()) {
-                const fragment = document.createDocumentFragment(); // Используем DocumentFragment
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
                     const li = document.createElement('li');
                     const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
                     li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
-                    fragment.appendChild(li);
+                    statsList.appendChild(li);
                 });
-                statsList.appendChild(fragment); // Добавляем все элементы за один раз
             } else {
                 const li = document.createElement('li');
                 li.textContent = 'Сканирований пока нет.';
@@ -372,7 +360,4 @@ document.addEventListener("DOMContentLoaded", function () {
         qrIcon.style.display = 'block';
         loadingIndicator.style.display = 'none';
     }
-
-    // Загружаем данные при инициализации
-    initializeData();
 });
