@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarMenu = document.getElementById('sidebarMenu');
     const addDataButton = document.getElementById('addDataButton');
-    const submitRawDataButton = document.getElementById('submitRawDataButton'); // Новый элемент
+    const submitRawDataButton = document.getElementById('submitRawDataButton');
     const rawDataInput = document.getElementById('rawData');
 
     let stream = null;
@@ -102,7 +102,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (addDataButton) {
         addDataButton.addEventListener('click', async () => {
-            sidebarMenu.style.display = 'block'; // Показываем меню для ввода данных
+            sidebarMenu.style.display = 'block';
         });
     }
 
@@ -184,8 +184,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
+            // Упростим запрос, убрав жесткое указание deviceId
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: camera.deviceId } },
+                video: true // Автоматический выбор камеры
             });
 
             videoElement.srcObject = stream;
@@ -195,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
 
-            codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
+            codeReader.decodeFromVideoDevice(null, 'qr-video', (result, err) => {
                 if (result) {
                     onScanSuccess(result.getText());
                     codeReader.reset();
@@ -207,8 +208,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             });
         } catch (err) {
-            console.error('Ошибка камеры:', err);
-            showMessage('error', 'Ошибка камеры', '', '', '');
+            console.error('Ошибка камеры:', err.name, err.message, err.constraint);
+            showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
             qrIcon.style.display = 'block';
         }
     }
