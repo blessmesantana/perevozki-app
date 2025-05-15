@@ -123,18 +123,10 @@ html {
     --frame-color: #ea1e63;
 }
 
-#qr-reader {
+#qr-video {
     width: 100%;
     height: 100%;
-    border: none;
-    border-radius: 20px;
-    overflow: hidden;
-}
-
-#qr-reader video {
-    width: 100%;
-    height: 100%;
-    object-fit: fill;
+    object-fit: cover;
     border-radius: 20px;
 }
 
@@ -158,13 +150,11 @@ html {
         opacity: 1;
         border-width: 4px;
     }
-
     50% {
         border-color: #4caf50;
         opacity: 0.5;
         border-width: 2px;
     }
-
     100% {
         border-color: #ea1e63;
         opacity: 1;
@@ -186,7 +176,6 @@ html {
     }
 }
 
-.qr部分: none;
 .qr-icon {
     position: absolute;
     width: 80px;
@@ -196,10 +185,6 @@ html {
     transform: translate(-50%, -50%);
     z-index: 11;
     pointer-events: none;
-}
-
-#qr-reader:not(:empty) + .qr-icon {
-    display: none;
 }
 
 .loading-indicator {
@@ -395,62 +380,50 @@ html {
     .button-group {
         width: calc(100% - 30px);
     }
-
     #manualSubmitButton {
         width: 90px;
         font-size: 13px;
     }
-
     #manualTransferId {
         font-size: 13px;
         padding: 0 10px;
     }
-
     .qr-container {
         width: 220px;
         height: 220px;
     }
-
     .qr-container::before {
         width: 160px;
         height: 160px;
     }
-
     .qr-icon {
         width: 60px;
         height: 60px;
     }
-
     .scan-button {
         width: 260px;
     }
-
     .scan-result {
         width: 200px;
         padding: 10px;
         min-height: 50px;
     }
-
     .transfer-id {
         font-size: 9px;
         margin-bottom: 1px;
     }
-
     .courier-name {
         font-size: 13px;
         margin-bottom: 1px;
     }
-
     .previous-courier {
         font-size: 11px;
         margin-top: 1px;
     }
-
     .status {
         font-size: 10px;
         margin-top: 1px;
     }
-
     .raw-data {
         font-size: 8px;
         margin-top: 2px;
