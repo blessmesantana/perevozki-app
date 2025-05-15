@@ -14,6 +14,13 @@
         <button id="sidebarToggle" class="sidebar-button">☰</button>
         <div id="sidebarMenu" class="sidebar-menu">
             <button id="addDataButton">📥 Добавить данные</button>
+            <textarea id="rawData" placeholder="Введите данные"></textarea>
+            <button id="submitRawDataButton">📥 Сохранить данные</button>
+            <button id="showStatsButton">📊 Показать статистику</button>
+            <div id="statsContainer" style="display: none; max-height: 200px; overflow-y: auto; margin-top: 10px; padding: 10px; background: #3f51b5; border-radius: 5px;">
+                <h3>Статистика сканирований</h3>
+                <ul id="statsList"></ul>
+            </div>
         </div>
 
         <div class="button-group">
@@ -44,11 +51,6 @@
 
         <button id="scanButton" class="scan-button">Сканировать QR код</button>
         <div class="info-text">Сканируйте QR передачи или введите ID вручную</div>
-
-        <div class="sidebar-menu">
-            <textarea id="rawData" placeholder="Введите данные"></textarea>
-            <button id="submitRawDataButton">📥 Добавить данные</button>
-        </div>
     </div>
 </body>
 </html>
