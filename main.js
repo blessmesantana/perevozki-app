@@ -1,5 +1,3 @@
-// main.js
-
 import { database } from './firebase.js';
 import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
@@ -38,6 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
+        if (!resultDiv) return;
         resultDiv.className = `scan-result ${status}`;
         let transferId = message;
         const match = message.match(/\d{10}|\d{4}/);
@@ -201,21 +200,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (!camera) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
-                qrIcon.style.display = 'block';
+                if (qrIcon) qrIcon.style.display = 'block';
                 return;
             }
 
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { exact: "environment" } // Приоритет задней камеры
+                    facingMode: { exact: "environment" }
                 }
             });
 
             videoElement.srcObject = stream;
             await videoElement.play();
 
-            // Скрываем иконку при запуске сканера
-            qrIcon.style.display = 'none';
+            if (qrIcon) qrIcon.style.display = 'none';
 
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
@@ -235,7 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (err) {
             console.error('Ошибка камеры:', err.name, err.message, err.constraint);
             showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
-            qrIcon.style.display = 'block';
+            if (qrIcon) qrIcon.style.display = 'block';
         }
     }
 
@@ -359,7 +357,7 @@ document.addEventListener("DOMContentLoaded", function () {
             videoElement.srcObject = null;
         }
         if (codeReader) codeReader.reset();
-        qrIcon.style.display = 'block';
+        if (qrIcon) qrIcon.style.display = 'block';
         loadingIndicator.style.display = 'none';
     }
 });
