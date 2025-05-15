@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let isProcessing = false;
 
     // Показ сообщения
-    window.showMessage = function(status, message, courier, previousCourier, rawData) {
+    window.showMessage = function (status, message, courier, previousCourier, rawData) {
         resultDiv.className = `scan-result ${status}`;
         let transferId = message;
         const match = message.match(/\d{10}|\d{4}/);
@@ -46,8 +46,8 @@ document.addEventListener("DOMContentLoaded", function () {
         resultCourier.textContent = courier ? `Курьер: ${courier}` : '';
         resultPrevious.textContent = previousCourier || '';
         resultStatus.textContent = status === 'already_scanned' ? 'Повторное сканирование' :
-                                 status === 'success' ? 'Успешно' :
-                                 status === 'not_found' ? 'Не найдено' : message;
+            status === 'success' ? 'Успешно' :
+            status === 'not_found' ? 'Не найдено' : message;
         resultRawData.textContent = rawData ? `Сырые данные: ${rawData}` : '';
         resultDiv.style.display = 'flex';
 
@@ -263,18 +263,19 @@ document.addEventListener("DOMContentLoaded", function () {
             if (cleanedId.length !== 4 && cleanedId.length !== 10) {
                 showMessage('error', 'Неверный формат ID', '', '', '');
                 isProcessing = false;
+                loadingIndicator.style.display = 'none'; // Убедимся, что индикатор скрыт
                 return;
             }
 
             const deliveriesQuery = query(ref(database, 'deliveries'));
-            const snapshot = await get(deliveriesQuery);
+            const deliveriesSnapshot = await get(deliveriesQuery);
 
             let found = false;
             let courierName = '';
             let courierId = '';
 
-            if (snapshot.exists()) {
-                snapshot.forEach(childSnapshot => {
+            if (deliveriesSnapshot.exists()) {
+                deliveriesSnapshot.forEach(childSnapshot => {
                     const data = childSnapshot.val();
                     if (data.id === cleanedId) {
                         courierName = data.courier_name;
@@ -291,19 +292,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 let duplicate = false;
                 let prevCourier = '';
 
-                scansSnapshot.forEach(scanSnap => {
-                    const scanData = scanSnap.val();
-                    if (scanData.delivery_id === cleanedId) {
-                        duplicate = true;
-                        prevCourier = scanData.courier_name;
-                    }
-                });
+                if (scansSnapshot.exists()) {  // Проверяем, есть ли данные
+                    scansSnapshot.forEach(scanSnap => {
+                        const scanData = scanSnap.val();
+                        if (scanData.delivery_id === cleanedId) {
+                            duplicate = true;
+                            prevCourier = scanData.courier_name;
+                        }
+                    });
+                }
 
                 if (duplicate) {
                     showMessage('already_scanned', cleanedId, courierName, `Ранее сканировал: ${prevCourier}`);
                 } else {
-                    const scansRef = push(ref(database, 'scans'));
-                    await set(scansRef, {
+                    const newScanRef = push(scansRef);  // Получаем ссылку на новый элемент
+                    await set(newScanRef, {
                         delivery_id: cleanedId,
                         courier_name: courierName,
                         timestamp: Date.now()
