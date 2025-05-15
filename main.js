@@ -1,7 +1,5 @@
-// main.js
-
 import { database } from './firebase.js';
-import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js ";
+import { ref, push, set, get, child, query, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
 document.addEventListener("DOMContentLoaded", function () {
     const resultDiv = document.getElementById('result');
@@ -25,14 +23,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const sidebarMenu = document.getElementById('sidebarMenu');
     const addDataButton = document.getElementById('addDataButton');
     const rawDataInput = document.getElementById('rawData');
+    const showStatsButton = document.getElementById('showStatsButton');
 
     let stream = null;
     let codeReader = null;
     let lastScanTime = 0;
     const scanDelay = 2000;
     let isProcessing = false;
+    let cachedDeliveries = {};
 
-    // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
         resultDiv.className = `scan-result ${status}`;
         let transferId = message;
@@ -56,7 +55,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 5000);
     }
 
-    // Обработчики событий
     inputModeButton.addEventListener('click', () => {
         inputModeButton.classList.add('active');
         manualSubmitButton.classList.add('active');
@@ -81,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     scanButton.addEventListener('click', () => {
         scanButton.classList.add('released');
-        startQrScanner();
+        checkCameraPermission();
         setTimeout(() => scanButton.classList.remove('released'), 500);
     });
 
@@ -110,11 +108,23 @@ document.addEventListener("DOMContentLoaded", function () {
         rawDataInput.value = '';
     });
 
-    // Функции
+    showStatsButton.addEventListener('click', displayCourierStats);
+
     function parseRawData(text) {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-        const courierName = lines[0];
-        const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
+        let courierName = '';
+        const deliveryIds = [];
+
+        if (lines.length > 0) {
+            courierName = lines[0];
+        }
+
+        for (const line of lines) {
+            if (/^\d{10}$/.test(line)) {
+                deliveryIds.push(line);
+            }
+        }
+
         return { courierName, deliveryIds };
     }
 
@@ -125,8 +135,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         try {
-            const couriersRef = ref(database, 'couriers');
-            const deliveriesRef = ref(database, 'deliveries');
+            const currentDate = new Date().toISOString().split('T')[0];
+            const couriersRef = ref(database, `couriers/${currentDate}`);
+            const deliveriesRef = ref(database, `deliveries/${currentDate}`);
 
             const newCourierRef = push(couriersRef);
             await set(newCourierRef, {
@@ -142,31 +153,58 @@ document.addEventListener("DOMContentLoaded", function () {
                     id,
                     courier_id: courierId,
                     courier_name: courierName,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    scanned: false
                 });
             }
 
             showMessage('success', '', `Добавлен курьер: ${courierName}`, `Передач: ${deliveryIds.length}`);
         } catch (e) {
-            console.error("Ошибка сохранения в Firebase: ", e);
-            showMessage('error', 'Ошибка при сохранении', '', '', '');
+            console.error("Ошибка сохранения в Firebase:", e);
+            showMessage('error', `Ошибка при сохранении: ${e.message}`, '', '', '');
+        }
+    }
+
+    async function checkCameraPermission() {
+        try {
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+            if (permissionStatus.state === 'granted') {
+                startQrScanner();
+            } else if (permissionStatus.state === 'prompt') {
+                showMessage('info', 'Пожалуйста, разрешите доступ к камере', '', '', '');
+                startQrScanner();
+            } else {
+                showMessage('error', 'Доступ к камере запрещен. Разрешите в настройках браузера.', '', '', '');
+            }
+        } catch (err) {
+            console.error('Ошибка проверки разрешений:', err);
+            showMessage('error', 'Ошибка проверки разрешений камеры', '', '', '');
         }
     }
 
     async function startQrScanner() {
         try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            const cameras = devices.filter(device => device.kind === 'videoinput');
-            const camera = cameras[0] || null;
+            stopQrScanner();
 
-            if (!camera) {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+            if (!videoDevices.length) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
                 qrIcon.style.display = 'block';
                 return;
             }
 
+            let selectedCamera = videoDevices.find(device =>
+                device.label.toLowerCase().includes('back') ||
+                device.label.toLowerCase().includes('rear')
+            ) || videoDevices[videoDevices.length - 1];
+
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: camera.deviceId } },
+                video: {
+                    deviceId: { exact: selectedCamera.deviceId },
+                    facingMode: { ideal: 'environment' }
+                }
             });
 
             videoElement.srcObject = stream;
@@ -176,7 +214,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
 
-            codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
+            qrIcon.style.display = 'none';
+            codeReader.decodeFromVideoDevice(selectedCamera.deviceId, 'qr-video', (result, err) => {
                 if (result) {
                     onScanSuccess(result.getText());
                     codeReader.reset();
@@ -189,7 +228,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         } catch (err) {
             console.error('Ошибка камеры:', err);
-            showMessage('error', 'Ошибка камеры', '', '', '');
+            showMessage('error', 'Ошибка доступа к камере. Проверьте разрешения.', '', '', '');
             qrIcon.style.display = 'block';
         }
     }
@@ -216,6 +255,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const cleanedId = transferId.replace(/[^\d]/g, '');
+            const currentDate = new Date().toISOString().split('T')[0];
 
             if (cleanedId.length !== 4 && cleanedId.length !== 10) {
                 showMessage('error', 'Неверный формат ID', '', '', '');
@@ -223,56 +263,67 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            const deliveriesQuery = query(ref(database, 'deliveries'));
-            const snapshot = await get(deliveriesQuery);
+            const deliveriesRef = ref(database, `deliveries/${currentDate}`);
+            const snapshot = await get(deliveriesRef);
 
-            let found = false;
-            let courierName = '';
-            let courierId = '';
-
+            let matches = [];
             if (snapshot.exists()) {
                 snapshot.forEach(childSnapshot => {
                     const data = childSnapshot.val();
-                    if (data.id === cleanedId) {
-                        courierName = data.courier_name;
-                        courierId = data.courier_id;
-                        found = true;
+                    const deliveryId = data.id;
+                    if (deliveryId === cleanedId || (cleanedId.length === 4 && deliveryId.endsWith(cleanedId))) {
+                        matches.push({ key: childSnapshot.key, ...data });
                     }
                 });
             }
 
-            if (found) {
-                const scansRef = ref(database, 'scans');
-                const scansQuery = query(scansRef);
-                const scansSnapshot = await get(scansQuery);
-                let duplicate = false;
-                let prevCourier = '';
+            if (matches.length === 0) {
+                showMessage('not_found', cleanedId);
+                isProcessing = false;
+                return;
+            }
 
+            if (matches.length > 1 && cleanedId.length === 4) {
+                showMessage('error', 'Найдено несколько совпадений. Уточните ID.', '', '', JSON.stringify(matches.map(m => m.id)));
+                isProcessing = false;
+                return;
+            }
+
+            const delivery = matches[0];
+            const courierName = delivery.courier_name;
+            const deliveryKey = delivery.key;
+
+            const scansRef = ref(database, `scans/${currentDate}`);
+            const scansSnapshot = await get(scansRef);
+            let duplicate = false;
+            let prevCourier = '';
+
+            if (scansSnapshot.exists()) {
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
-                    if (scanData.delivery_id === cleanedId) {
+                    if (scanData.delivery_id === delivery.id) {
                         duplicate = true;
                         prevCourier = scanData.courier_name;
                     }
                 });
+            }
 
-                if (duplicate) {
-                    showMessage('already_scanned', cleanedId, courierName, `Ранее сканировал: ${prevCourier}`);
-                } else {
-                    const scansRef = push(ref(database, 'scans'));
-                    await set(scansRef, {
-                        delivery_id: cleanedId,
-                        courier_name: courierName,
-                        timestamp: Date.now()
-                    });
-                    showMessage('success', cleanedId, courierName);
-                }
+            if (duplicate) {
+                showMessage('already_scanned', delivery.id, courierName, `Ранее сканировал: ${prevCourier}`);
             } else {
-                showMessage('not_found', cleanedId);
+                const newScanRef = push(scansRef);
+                await set(newScanRef, {
+                    delivery_id: delivery.id,
+                    courier_name: courierName,
+                    timestamp: Date.now()
+                });
+
+                await set(ref(database, `deliveries/${currentDate}/${deliveryKey}/scanned`), true);
+                showMessage('success', delivery.id, courierName);
             }
         } catch (e) {
             console.error('Ошибка поиска:', e);
-            showMessage('error', 'Ошибка при поиске', '', '', '');
+            showMessage('error', `Ошибка при поиске: ${e.message}`, '', '', '');
         } finally {
             loadingIndicator.style.display = 'none';
             isProcessing = false;
@@ -288,5 +339,63 @@ document.addEventListener("DOMContentLoaded", function () {
         if (codeReader) codeReader.reset();
         qrIcon.style.display = 'block';
         loadingIndicator.style.display = 'none';
+    }
+
+    async function displayCourierStats() {
+        const currentDate = new Date().toISOString().split('T')[0];
+        const couriersRef = ref(database, `couriers/${currentDate}`);
+        const deliveriesRef = ref(database, `deliveries/${currentDate}`);
+
+        const couriersSnapshot = await get(couriersRef);
+        const deliveriesSnapshot = await get(deliveriesRef);
+
+        let stats = [];
+        if (couriersSnapshot.exists()) {
+            couriersSnapshot.forEach(courierSnap => {
+                const courier = courierSnap.val();
+                let scannedCount = 0;
+                let totalCount = 0;
+
+                if (deliveriesSnapshot.exists()) {
+                    deliveriesSnapshot.forEach(deliverySnap => {
+                        const delivery = deliverySnap.val();
+                        if (delivery.courier_id === courierSnap.key) {
+                            totalCount++;
+                            if (delivery.scanned) scannedCount++;
+                        }
+                    });
+                }
+
+                stats.push({
+                    date: currentDate,
+                    courier: courier.name,
+                    total: totalCount,
+                    scanned: scannedCount,
+                    notScanned: totalCount - scannedCount
+                });
+            });
+        }
+
+        const statsContainer = document.createElement('div');
+        statsContainer.innerHTML = `
+            <h3>Статистика за ${currentDate}</h3>
+            <table>
+                <tr>
+                    <th>Курьер</th>
+                    <th>Всего</th>
+                    <th>Отсканировано</th>
+                    <th>Не отсканировано</th>
+                </tr>
+                ${stats.map(s => `
+                    <tr>
+                        <td>${s.courier}</td>
+                        <td>${s.total}</td>
+                        <td>${s.scanned}</td>
+                        <td>${s.notScanned}</td>
+                    </tr>
+                `).join('')}
+            </table>
+        `;
+        sidebarMenu.appendChild(statsContainer);
     }
 });
