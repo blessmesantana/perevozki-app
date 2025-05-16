@@ -33,6 +33,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const statsList = document.getElementById('statsList');
     const rawDataInput = document.getElementById('rawData');
 
+    const sidebarDataForm = document.getElementById('sidebarDataForm');
+    const sidebarDataInput = document.getElementById('sidebarDataInput');
+    const sidebarShowStatsButton = document.getElementById('sidebarShowStatsButton');
+    const sidebarMenuNav = document.querySelector('nav#sidebarMenu');
+    const sidebarStatsList = document.createElement('ul');
+    sidebarStatsList.style.width = '100%';
+    sidebarStatsList.style.background = '#3f51b5';
+    sidebarStatsList.style.borderRadius = '5px';
+    sidebarStatsList.style.padding = '10px';
+    sidebarStatsList.style.marginTop = '10px';
+    sidebarStatsList.style.maxHeight = '200px';
+    sidebarStatsList.style.overflowY = 'auto';
+    let sidebarStatsVisible = false;
+
     let stream = null;
     let codeReader = null;
     let lastScanTime = 0;
@@ -45,23 +59,39 @@ document.addEventListener("DOMContentLoaded", function () {
         qrResultOverlay.style.width = `${buttonWidth}px`;
     }
 
+    // --- Корректировка ширины overlay при изменении размера окна ---
+    function updateOverlayWidth() {
+        if (inputModeButton && qrResultOverlay) {
+            const buttonWidth = inputModeButton.offsetWidth;
+            qrResultOverlay.style.width = `${buttonWidth}px`;
+        }
+    }
+    window.addEventListener('resize', updateOverlayWidth);
+    updateOverlayWidth();
+
     // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
         if (!qrResultOverlay) return;
         let text = '';
+        let colorClass = '';
         if (status === 'already_scanned') {
-            text = `Повторное сканирование. ${message} ${courier ? 'Курьер: ' + courier : ''} ${previousCourier ? previousCourier : ''}`;
+            text = courier ? courier : '';
+            colorClass = 'already_scanned';
         } else if (status === 'success') {
-            text = `Успешно. ${message ? 'ID: ' + message : ''} ${courier ? 'Курьер: ' + courier : ''}`;
+            text = courier ? courier : '';
+            colorClass = 'success';
         } else if (status === 'not_found') {
-            text = `Не найдено. ${message ? 'ID: ' + message : ''}`;
+            text = courier ? courier : '';
+            colorClass = 'error';
         } else if (status === 'error') {
             text = message;
+            colorClass = 'error';
         } else {
             text = message;
+            colorClass = '';
         }
         qrResultOverlay.innerHTML = `<div class='qr-overlay-box'>${text.trim()}</div>`;
-        qrResultOverlay.className = `show ${status}`;
+        qrResultOverlay.className = `show ${colorClass}`;
         setTimeout(() => {
             qrResultOverlay.className = '';
         }, 2200);
@@ -147,6 +177,70 @@ document.addEventListener("DOMContentLoaded", function () {
             submitRawDataButton.style.display = 'none';
             statsContainer.style.display = 'block';
             await loadStats();
+        });
+    }
+
+    if (sidebarDataForm && sidebarDataInput) {
+        sidebarDataForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = sidebarDataInput.value.trim();
+            if (!text) {
+                showMessage('error', 'Введите данные', '', '', '');
+                return;
+            }
+            const { courierName, deliveryIds } = parseRawData(text);
+            if (!courierName) {
+                showMessage('error', 'Не найдено имя курьера', '', '', '');
+                return;
+            }
+            if (deliveryIds.length === 0) {
+                showMessage('error', 'Не найдены номера передач', '', '', '');
+                return;
+            }
+            await saveCourierAndDeliveries(courierName, deliveryIds);
+            sidebarDataInput.value = '';
+        });
+    }
+
+    if (sidebarShowStatsButton && sidebarMenuNav) {
+        sidebarShowStatsButton.addEventListener('click', async () => {
+            if (sidebarStatsVisible) {
+                sidebarStatsList.innerHTML = '';
+                sidebarStatsList.style.display = 'none';
+                sidebarStatsVisible = false;
+                return;
+            }
+            sidebarStatsList.innerHTML = '';
+            sidebarStatsList.style.display = 'block';
+            try {
+                const scansRef = ref(database, 'scans');
+                const scansQuery = query(scansRef);
+                const scansSnapshot = await get(scansQuery);
+                if (scansSnapshot.exists()) {
+                    scansSnapshot.forEach(scanSnap => {
+                        const scanData = scanSnap.val();
+                        const li = document.createElement('li');
+                        li.textContent = scanData.courier_name || '';
+                        li.style.fontWeight = 'bold';
+                        if (scanSnap.key && scanData && scanData.status) {
+                            if (scanData.status === 'success') li.style.color = '#4caf50';
+                            else if (scanData.status === 'already_scanned') li.style.color = '#ffc107';
+                            else li.style.color = '#ea1e63';
+                        }
+                        sidebarStatsList.appendChild(li);
+                    });
+                } else {
+                    const li = document.createElement('li');
+                    li.textContent = 'Сканирований пока нет.';
+                    sidebarStatsList.appendChild(li);
+                }
+            } catch (e) {
+                const li = document.createElement('li');
+                li.textContent = 'Ошибка загрузки статистики.';
+                sidebarStatsList.appendChild(li);
+            }
+            sidebarMenuNav.appendChild(sidebarStatsList);
+            sidebarStatsVisible = true;
         });
     }
 
