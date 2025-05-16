@@ -561,44 +561,155 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     text-align: center;
 }
 
-#toast {
-    position: fixed;
-    top: 110px;
-    left: 50%;
-    transform: translateX(-50%);
-    min-width: 220px;
-    max-width: 90vw;
-    z-index: 2000;
-    padding: 16px 28px;
-    border-radius: 18px;
-    font-family: 'Inter', sans-serif;
-    font-size: 15px;
-    font-weight: 500;
-    color: #fff;
-    background: #4caf50;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.4s, background 0.3s;
-    text-align: center;
+#qr-result-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 120px;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 10;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
 }
-#toast.toast-show {
+#qr-result-overlay.show {
     opacity: 1;
-    pointer-events: auto;
 }
-#toast.toast-success { background: #4caf50; }
-#toast.toast-error { background: #ea1e63; }
-#toast.toast-already_scanned { background: #ffc107; color: #222; }
-#toast.toast-not_found { background: #ea1e63; }
+#qr-result-overlay .qr-overlay-box {
+    width: 100%;
+    background: rgba(40, 40, 40, 0.92);
+    color: #fff;
+    border-radius: 16px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    pointer-events: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#qr-result-overlay.success .qr-overlay-box { background: rgba(76, 175, 80, 0.92); color: #fff; }
+#qr-result-overlay.error .qr-overlay-box, #qr-result-overlay.not_found .qr-overlay-box { background: rgba(234, 30, 99, 0.92); color: #fff; }
+#qr-result-overlay.already_scanned .qr-overlay-box { background: rgba(255, 193, 7, 0.92); color: #222; }
 
 @media (max-width: 480px) {
-    #toast {
-        min-width: 120px;
+    #qr-result-overlay .qr-overlay-box {
+        font-size: 12px;
+        padding: 4px 4px;
+    }
+    #qr-result-overlay {
+        width: 90px;
+    }
+}
+
+#qr-result-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+}
+#qr-result-overlay.show {
+    opacity: 1;
+}
+#qr-result-overlay .qr-overlay-box {
+    background: rgba(40, 40, 40, 0.82);
+    color: #fff;
+    border-radius: 16px;
+    padding: 14px 18px;
+    max-width: 90%;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.3;
+    pointer-events: auto;
+}
+#qr-result-overlay.success .qr-overlay-box { background: rgba(76, 175, 80, 0.92); color: #fff; }
+#qr-result-overlay.error .qr-overlay-box, #qr-result-overlay.not_found .qr-overlay-box { background: rgba(234, 30, 99, 0.92); color: #fff; }
+#qr-result-overlay.already_scanned .qr-overlay-box { background: rgba(255, 193, 7, 0.92); color: #222; }
+
+@media (max-width: 480px) {
+    #qr-result-overlay .qr-overlay-box {
         font-size: 13px;
-        padding: 12px 10px;
-        top: 100px;
+        padding: 10px 8px;
+    }
+}
+
+@media (max-width: 360px) {
+    .button-group {
+        width: calc(100% - 30px);
+    }
+
+    #manualSubmitButton {
+        width: 90px;
+        font-size: 13px;
+    }
+
+    #manualTransferId {
+        font-size: 13px;
+        padding: 0 10px;
+    }
+
+    .qr-container {
+        width: 220px;
+        height: 220px;
+    }
+
+    .qr-container::before {
+        width: 160px;
+        height: 160px;
+    }
+
+    .qr-icon {
+        width: 60px;
+        height: 60px;
+    }
+
+    .scan-button {
+        width: 260px;
+    }
+
+    .scan-result {
+        width: 200px;
+        padding: 10px;
+        min-height: 50px;
+    }
+
+    .transfer-id {
+        font-size: 9px;
+        margin-bottom: 1px;
+    }
+
+    .courier-name {
+        font-size: 13px;
+        margin-bottom: 1px;
+    }
+
+    .previous-courier {
+        font-size: 11px;
+        margin-top: 1px;
+    }
+
+    .status {
+        font-size: 10px;
+        margin-top: 1px;
+    }
+
+    .raw-data {
+        font-size: 8px;
+        margin-top: 2px;
     }
 }

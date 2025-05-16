@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const resultPrevious = document.getElementById('resultPrevious');
     const resultStatus = document.getElementById('resultStatus');
     const resultRawData = document.getElementById('resultRawData');
+    const qrResultOverlay = document.getElementById('qr-result-overlay');
 
     const inputModeButton = document.getElementById('inputModeButton');
     const manualInputContainer = document.getElementById('manualInputContainer');
@@ -38,10 +39,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const scanDelay = 2000;
     let isProcessing = false;
 
-    // Показ сообщения через toast
-    const toast = document.getElementById('toast');
+    // Dynamically adjust the overlay width to match the button
+    if (inputModeButton && qrResultOverlay) {
+        const buttonWidth = inputModeButton.offsetWidth;
+        qrResultOverlay.style.width = `${buttonWidth}px`;
+    }
+
+    // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
-        if (!toast) return;
+        if (!qrResultOverlay) return;
         let text = '';
         if (status === 'already_scanned') {
             text = `Повторное сканирование. ${message} ${courier ? 'Курьер: ' + courier : ''} ${previousCourier ? previousCourier : ''}`;
@@ -54,10 +60,10 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
             text = message;
         }
-        toast.textContent = text.trim();
-        toast.className = `toast toast-show toast-${status}`;
+        qrResultOverlay.innerHTML = `<div class='qr-overlay-box'>${text.trim()}</div>`;
+        qrResultOverlay.className = `show ${status}`;
         setTimeout(() => {
-            toast.classList.remove('toast-show');
+            qrResultOverlay.className = '';
         }, 2200);
         resultDiv.style.display = 'none';
     }
@@ -167,6 +173,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         try {
+            console.log('Сохранение курьера:', courierName, 'и передач:', deliveryIds);
+
             const couriersRef = ref(database, 'couriers');
             const deliveriesRef = ref(database, 'deliveries');
 
@@ -178,6 +186,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const courierId = newCourierRef.key;
 
+            console.log('Курьер сохранен с ID:', courierId);
+
             for (const id of deliveryIds) {
                 const newDeliveryRef = push(deliveriesRef);
                 await set(newDeliveryRef, {
@@ -186,6 +196,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     courier_name: courierName,
                     timestamp: Date.now()
                 });
+
+                console.log('Передача сохранена с ID:', id);
             }
 
             showMessage('success', '', `Добавлен курьер: ${courierName}`, `Передач: ${deliveryIds.length}`);
@@ -325,6 +337,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function loadStats() {
         statsList.innerHTML = '';
+        console.log('Загрузка статистики...');
         try {
             const scansRef = ref(database, 'scans');
             const scansQuery = query(scansRef);
@@ -333,6 +346,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (scansSnapshot.exists()) {
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
+                    console.log('Сканирование:', scanData);
                     const li = document.createElement('li');
                     const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
                     li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
@@ -343,6 +357,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 li.textContent = 'Сканирований пока нет.';
                 statsList.appendChild(li);
             }
+            console.log('Статистика загружена успешно.');
         } catch (e) {
             console.error('Ошибка загрузки статистики:', e);
             const li = document.createElement('li');

@@ -10,7 +10,6 @@
     <script type="module" src="firebase.js"></script>
 </head>
 <body>
-    <div id="toast"></div>
     <input type="checkbox" id="sidebarToggle" hidden />
     <label class="sidebarIconToggle" for="sidebarToggle">
       <div class="diagonal part-1"></div>
@@ -39,6 +38,7 @@
 
         <div class="button-group">
             <button id="inputModeButton" class="button-group-item">ID передачи</button>
+            <div id="qr-result-overlay"></div>
             <div id="manualInputContainer" class="button-group">
                 <input type="text" id="manualTransferId" placeholder="Введите ID">
                 <button id="manualSubmitButton" class="button-group-item">Отправить</button>
