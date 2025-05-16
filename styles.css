@@ -673,3 +673,27 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
         margin-top: 2px;
     }
 }
+
+input[type="date"] {
+  background: #3f51b5;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  padding: 7px 0 7px 10px;
+  outline: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  width: 100%;
+  margin-bottom: 18px;
+  text-align: left;
+  transition: background 0.2s, color 0.2s;
+}
+input[type="date"]::-webkit-input-placeholder { color: #fff; }
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.5);
+}
+input[type="date"]:focus {
+  background: #283593;
+  color: #fff;
+}

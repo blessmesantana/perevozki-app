@@ -202,47 +202,372 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    if (sidebarShowStatsButton && sidebarMenuNav) {
-        sidebarShowStatsButton.addEventListener('click', async () => {
-            if (sidebarStatsVisible) {
-                sidebarStatsList.innerHTML = '';
-                sidebarStatsList.style.display = 'none';
-                sidebarStatsVisible = false;
-                return;
-            }
-            sidebarStatsList.innerHTML = '';
-            sidebarStatsList.style.display = 'block';
-            try {
-                const scansRef = ref(database, 'scans');
-                const scansQuery = query(scansRef);
-                const scansSnapshot = await get(scansQuery);
-                if (scansSnapshot.exists()) {
-                    scansSnapshot.forEach(scanSnap => {
-                        const scanData = scanSnap.val();
-                        const li = document.createElement('li');
-                        li.textContent = scanData.courier_name || '';
-                        li.style.fontWeight = 'bold';
-                        if (scanSnap.key && scanData && scanData.status) {
-                            if (scanData.status === 'success') li.style.color = '#4caf50';
-                            else if (scanData.status === 'already_scanned') li.style.color = '#ffc107';
-                            else li.style.color = '#ea1e63';
-                        }
-                        sidebarStatsList.appendChild(li);
-                    });
-                } else {
-                    const li = document.createElement('li');
-                    li.textContent = 'Сканирований пока нет.';
-                    sidebarStatsList.appendChild(li);
+    if (sidebarShowStatsButton) sidebarShowStatsButton.remove();
+    if (sidebarStatsList) sidebarStatsList.remove();
+
+    // Переименовываем кнопку и переносим в неё функционал показа передач по курьеру
+    const processButton = document.createElement('button');
+    processButton.textContent = 'Процесс сканирования';
+    processButton.id = 'processScanButton';
+    processButton.style.background = 'none';
+    processButton.style.color = '#fff';
+    processButton.style.border = 'none';
+    processButton.style.fontSize = '13px';
+    processButton.style.fontWeight = '500';
+    processButton.style.fontFamily = 'Inter, sans-serif';
+    processButton.style.textAlign = 'center';
+    processButton.style.borderRadius = '18px';
+    processButton.style.transition = 'background 0.2s';
+    processButton.style.letterSpacing = 'normal';
+    processButton.style.cursor = 'pointer';
+    processButton.style.marginTop = '1px';
+    processButton.style.padding = '12px 0 10px 0';
+    processButton.style.width = '100%';
+    sidebarMenuNav.appendChild(processButton);
+
+    // === КНОПКА "АРХИВ" В САЙДБАРЕ ===
+    const archiveButton = document.createElement('button');
+    archiveButton.id = 'archiveButton';
+    archiveButton.style.background = 'none';
+    archiveButton.style.color = '#fff';
+    archiveButton.style.border = 'none';
+    archiveButton.style.fontSize = '13px';
+    archiveButton.style.fontWeight = '500';
+    archiveButton.style.fontFamily = 'Inter, sans-serif';
+    archiveButton.style.textAlign = 'center';
+    archiveButton.style.borderRadius = '18px';
+    archiveButton.style.transition = 'background 0.2s';
+    archiveButton.style.letterSpacing = 'normal';
+    archiveButton.style.cursor = 'pointer';
+    archiveButton.style.marginTop = 'auto';
+    archiveButton.style.marginBottom = '8px';
+    archiveButton.style.padding = '12px 0 10px 0';
+    archiveButton.style.width = '100%';
+    archiveButton.style.display = 'flex';
+    archiveButton.style.alignItems = 'center';
+    archiveButton.style.justifyContent = 'center';
+    // SVG иконка архива (простая папка)
+    archiveButton.innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right:7px;"><path d="M2 6.5V16a2 2 0 002 2h12a2 2 0 002-2V6.5M2 6.5L4.5 3h11L18 6.5M2 6.5h16" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Архив`;
+    // Вставляем в самый низ сайдбара
+    sidebarMenuNav.appendChild(archiveButton);
+
+    // === МОДАЛЬНОЕ ОКНО АРХИВА ===
+    let archiveModal = null;
+    archiveButton.addEventListener('click', async () => {
+        if (archiveModal) archiveModal.remove();
+        archiveModal = document.createElement('div');
+        archiveModal.style.position = 'fixed';
+        archiveModal.style.top = '0';
+        archiveModal.style.left = '0';
+        archiveModal.style.width = '100vw';
+        archiveModal.style.height = '100vh';
+        archiveModal.style.background = 'rgba(0,0,0,0.7)';
+        archiveModal.style.display = 'flex';
+        archiveModal.style.alignItems = 'center';
+        archiveModal.style.justifyContent = 'center';
+        archiveModal.style.zIndex = '9999';
+        archiveModal.addEventListener('click', () => archiveModal.remove());
+
+        const modalContent = document.createElement('div');
+        modalContent.style.background = '#3f51b5';
+        modalContent.style.borderRadius = '32px';
+        modalContent.style.padding = '32px 24px';
+        modalContent.style.minWidth = '260px';
+        modalContent.style.maxWidth = '90vw';
+        modalContent.style.color = 'white';
+        modalContent.style.textAlign = 'center';
+        modalContent.style.position = 'relative';
+        modalContent.style.fontFamily = 'Inter, sans-serif';
+        modalContent.style.fontSize = '13px';
+        modalContent.addEventListener('click', e => e.stopPropagation());
+
+        // Заголовок
+        const title = document.createElement('div');
+        title.textContent = 'Архив передач по дате';
+        title.style.fontSize = '13px';
+        title.style.fontWeight = '500';
+        title.style.marginBottom = '18px';
+        title.style.fontFamily = 'Inter, sans-serif';
+        modalContent.appendChild(title);
+
+        // === ВЫБОР ДАТЫ ===
+        // Получаем список дат из архива (пусть структура: archive/YYYY-MM-DD/deliveries, archive/YYYY-MM-DD/scans)
+        const archiveRef = ref(database, 'archive');
+        const archiveSnap = await get(archiveRef);
+        let dateList = [];
+        if (archiveSnap.exists()) {
+            archiveSnap.forEach(child => {
+                dateList.push(child.key); // YYYY-MM-DD
+            });
+        }
+        dateList = dateList.sort((a, b) => b.localeCompare(a)); // новые сверху
+        if (dateList.length === 0) {
+            const empty = document.createElement('div');
+            empty.textContent = 'Архив пуст.';
+            empty.style.margin = '20px 0';
+            modalContent.appendChild(empty);
+        } else {
+            // === КАЛЕНДАРЬ ===
+            const dateInput = document.createElement('input');
+            dateInput.type = 'date';
+            dateInput.style.width = '100%';
+            dateInput.style.marginBottom = '18px';
+            dateInput.style.fontSize = '13px';
+            dateInput.style.padding = '7px 0 7px 10px';
+            dateInput.style.borderRadius = '10px';
+            dateInput.style.border = 'none';
+            dateInput.style.background = '#3f51b5';
+            dateInput.style.color = '#fff';
+            dateInput.style.fontFamily = 'Inter, sans-serif';
+            dateInput.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+            dateInput.style.outline = 'none';
+            dateInput.style.textAlign = 'left';
+            // Ограничим выбор только существующими датами
+            dateInput.min = dateList[dateList.length-1];
+            dateInput.max = dateList[0];
+            dateInput.value = dateList[0];
+            modalContent.appendChild(dateInput);
+
+            // Контейнер для данных архива
+            const archiveDataDiv = document.createElement('div');
+            archiveDataDiv.style.marginTop = '10px';
+            archiveDataDiv.style.textAlign = 'left';
+            modalContent.appendChild(archiveDataDiv);
+
+            async function loadArchiveForDate(date) {
+                archiveDataDiv.innerHTML = '<div style="margin:10px 0;">Загрузка...</div>';
+                // Получаем deliveries и scans за выбранную дату
+                const [delSnap, scanSnap] = await Promise.all([
+                    get(ref(database, `archive/${date}/deliveries`)),
+                    get(ref(database, `archive/${date}/scans`))
+                ]);
+                const deliveries = [];
+                if (delSnap.exists()) {
+                    delSnap.forEach(child => deliveries.push(child.val()));
                 }
-            } catch (e) {
-                const li = document.createElement('li');
-                li.textContent = 'Ошибка загрузки статистики.';
-                sidebarStatsList.appendChild(li);
+                const scans = [];
+                if (scanSnap.exists()) {
+                    scanSnap.forEach(child => scans.push(child.val()));
+                }
+                // Группируем сканы по delivery_id
+                const scannedSet = new Set(scans.map(s => s.delivery_id));
+                // Неотсканированные и отсканированные
+                const notScanned = deliveries.filter(d => !scannedSet.has(d.id));
+                const scannedList = deliveries.filter(d => scannedSet.has(d.id));
+                // Выводим
+                archiveDataDiv.innerHTML = '';
+                const notScannedTitle = document.createElement('div');
+                notScannedTitle.textContent = `Неотсканированные (${notScanned.length}):`;
+                notScannedTitle.style.margin = '10px 0 4px 0';
+                notScannedTitle.style.fontWeight = '500';
+                archiveDataDiv.appendChild(notScannedTitle);
+                notScanned.forEach(d => {
+                    const el = document.createElement('div');
+                    el.textContent = `${d.id} (${d.courier_name})`;
+                    el.style.fontSize = '13px';
+                    el.style.opacity = '1';
+                    el.style.fontFamily = 'Inter, sans-serif';
+                    archiveDataDiv.appendChild(el);
+                });
+                const scannedTitle = document.createElement('div');
+                scannedTitle.textContent = `Отсканированные (${scannedList.length}):`;
+                scannedTitle.style.margin = '14px 0 4px 0';
+                scannedTitle.style.fontWeight = '500';
+                archiveDataDiv.appendChild(scannedTitle);
+                scannedList.forEach(d => {
+                    const el = document.createElement('div');
+                    el.textContent = `${d.id} (${d.courier_name})`;
+                    el.style.fontSize = '13px';
+                    el.style.opacity = '0.6';
+                    el.style.fontFamily = 'Inter, sans-serif';
+                    archiveDataDiv.appendChild(el);
+                });
+                if (notScanned.length === 0 && scannedList.length === 0) {
+                    archiveDataDiv.innerHTML = '<div style="margin:10px 0;">Нет данных за выбранную дату.</div>';
+                }
             }
-            sidebarMenuNav.appendChild(sidebarStatsList);
-            sidebarStatsVisible = true;
+            // При выборе даты
+            dateInput.addEventListener('change', e => {
+                loadArchiveForDate(e.target.value);
+            });
+            // По умолчанию — первая дата
+            loadArchiveForDate(dateInput.value);
+        }
+        archiveModal.appendChild(modalContent);
+        document.body.appendChild(archiveModal);
+    });
+
+    // Модальное окно для вывода статистики по курьеру (оставляем как было)
+    let courierStatsModal = null;
+    function showCourierStatsModal(courierName) {
+        if (courierStatsModal) courierStatsModal.remove();
+        courierStatsModal = document.createElement('div');
+        courierStatsModal.style.position = 'fixed';
+        courierStatsModal.style.top = '0';
+        courierStatsModal.style.left = '0';
+        courierStatsModal.style.width = '100vw';
+        courierStatsModal.style.height = '100vh';
+        courierStatsModal.style.background = 'rgba(0,0,0,0.7)';
+        courierStatsModal.style.display = 'flex';
+        courierStatsModal.style.alignItems = 'center';
+        courierStatsModal.style.justifyContent = 'center';
+        courierStatsModal.style.zIndex = '9999';
+        courierStatsModal.addEventListener('click', () => courierStatsModal.remove());
+
+        const modalContent = document.createElement('div');
+        modalContent.style.background = '#3f51b5';
+        modalContent.style.borderRadius = '32px';
+        modalContent.style.padding = '32px 24px';
+        modalContent.style.minWidth = '260px';
+        modalContent.style.maxWidth = '90vw';
+        modalContent.style.color = 'white';
+        modalContent.style.textAlign = 'center';
+        modalContent.style.position = 'relative';
+        modalContent.style.fontFamily = 'Inter, sans-serif';
+        modalContent.style.fontSize = '13px';
+        modalContent.addEventListener('click', e => e.stopPropagation());
+
+        const title = document.createElement('div');
+        title.textContent = courierName;
+        title.style.fontSize = '13px';
+        title.style.fontWeight = '500';
+        title.style.marginBottom = '18px';
+        title.style.fontFamily = 'Inter, sans-serif';
+        modalContent.appendChild(title);
+
+        // Добавим кнопку закрытия для удобства
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '×';
+        closeBtn.style.position = 'absolute';
+        closeBtn.style.top = '12px';
+        closeBtn.style.right = '18px';
+        closeBtn.style.background = 'none';
+        closeBtn.style.border = 'none';
+        closeBtn.style.color = '#fff';
+        closeBtn.style.fontSize = '22px';
+        closeBtn.style.cursor = 'pointer';
+        closeBtn.style.fontFamily = 'Inter, sans-serif';
+        closeBtn.addEventListener('click', () => courierStatsModal.remove());
+        modalContent.appendChild(closeBtn);
+
+        // Получаем все передачи и сканы для этого курьера
+        Promise.all([
+            get(query(ref(database, 'deliveries'))),
+            get(query(ref(database, 'scans')))
+        ]).then(([deliveriesSnap, scansSnap]) => {
+            const allDeliveries = [];
+            if (deliveriesSnap.exists()) {
+                deliveriesSnap.forEach(child => {
+                    const d = child.val();
+                    if (d.courier_name === courierName) allDeliveries.push(d.id);
+                });
+            }
+            const scanned = new Set();
+            if (scansSnap.exists()) {
+                scansSnap.forEach(child => {
+                    const s = child.val();
+                    if (s.courier_name === courierName) scanned.add(s.delivery_id);
+                });
+            }
+            // Неотсканированные сверху, отсканированные снизу (opacity 0.6)
+            const notScanned = allDeliveries.filter(id => !scanned.has(id));
+            const scannedList = allDeliveries.filter(id => scanned.has(id));
+            const list = document.createElement('div');
+            list.style.display = 'flex';
+            list.style.flexDirection = 'column';
+            list.style.gap = '6px';
+            notScanned.forEach(id => {
+                const el = document.createElement('div');
+                el.textContent = id;
+                el.style.fontSize = '13px';
+                el.style.opacity = '1';
+                el.style.transition = 'opacity 0.3s';
+                el.style.fontFamily = 'Inter, sans-serif';
+                list.appendChild(el);
+            });
+            scannedList.forEach(id => {
+                const el = document.createElement('div');
+                el.textContent = id;
+                el.style.fontSize = '13px';
+                el.style.opacity = '0.6';
+                el.style.transition = 'opacity 0.3s';
+                el.style.fontFamily = 'Inter, sans-serif';
+                list.appendChild(el);
+            });
+            modalContent.appendChild(list);
         });
+
+        courierStatsModal.appendChild(modalContent);
+        document.body.appendChild(courierStatsModal);
     }
+
+    processButton.addEventListener('click', async () => {
+        // Получаем список всех курьеров
+        const couriersSnap = await get(query(ref(database, 'couriers')));
+        let couriers = [];
+        if (couriersSnap.exists()) {
+            couriersSnap.forEach(child => {
+                const c = child.val();
+                if (c.name) couriers.push(c.name);
+            });
+        }
+        couriers = [...new Set(couriers)];
+        // Показываем выбор курьера
+        const selectModal = document.createElement('div');
+        selectModal.style.position = 'fixed';
+        selectModal.style.top = '0';
+        selectModal.style.left = '0';
+        selectModal.style.width = '100vw';
+        selectModal.style.height = '100vh';
+        selectModal.style.background = 'rgba(0,0,0,0.7)';
+        selectModal.style.display = 'flex';
+        selectModal.style.alignItems = 'center';
+        selectModal.style.justifyContent = 'center';
+        selectModal.style.zIndex = '9999';
+        selectModal.addEventListener('click', () => selectModal.remove());
+        const modalContent = document.createElement('div');
+        modalContent.style.background = '#3f51b5';
+        modalContent.style.borderRadius = '32px';
+        modalContent.style.padding = '32px 24px';
+        modalContent.style.minWidth = '260px';
+        modalContent.style.maxWidth = '90vw';
+        modalContent.style.color = 'white';
+        modalContent.style.textAlign = 'center';
+        modalContent.style.position = 'relative';
+        modalContent.style.fontFamily = 'Inter, sans-serif';
+        modalContent.style.fontSize = '13px';
+        modalContent.addEventListener('click', e => e.stopPropagation());
+        const title = document.createElement('div');
+        title.textContent = 'Выберите курьера';
+        title.style.fontSize = '13px';
+        title.style.fontWeight = '500';
+        title.style.marginBottom = '18px';
+        title.style.fontFamily = 'Inter, sans-serif';
+        modalContent.appendChild(title);
+        couriers.forEach(name => {
+            const btn = document.createElement('button');
+            btn.textContent = name;
+            btn.style.display = 'block';
+            btn.style.width = '100%';
+            btn.style.margin = '8px 0';
+            btn.style.padding = '10px 0';
+            btn.style.background = '#ea1e63';
+            btn.style.color = 'white';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '18px';
+            btn.style.fontSize = '13px';
+            btn.style.fontWeight = '500';
+            btn.style.fontFamily = 'Inter, sans-serif';
+            btn.style.cursor = 'pointer';
+            btn.addEventListener('click', () => {
+                selectModal.remove();
+                showCourierStatsModal(name);
+            });
+            modalContent.appendChild(btn);
+        });
+        selectModal.appendChild(modalContent);
+        document.body.appendChild(selectModal);
+    });
 
     // Функции
     function parseRawData(text) {
