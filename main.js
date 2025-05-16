@@ -249,13 +249,16 @@ document.addEventListener("DOMContentLoaded", function () {
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
-        // Извлекаем фамилию из первой строки, убираем всё после первого пробела или дефиса
+        // Фамилия — только первое слово первой строки, только буквы (рус/лат)
         const firstLine = lines[0];
-        const courierNameMatch = firstLine.match(/^[А-Яа-яA-Za-z]+/);
-        const courierName = courierNameMatch ? courierNameMatch[0] : '';
+        const courierNameMatch = firstLine.match(/^([А-Яа-яA-Za-z]+)/);
+        const courierName = courierNameMatch ? courierNameMatch[1] : '';
 
-        // Извлекаем только 10-значные числа
-        const deliveryIds = lines.filter(line => /^\d{10}$/.test(line));
+        // Все 10-значные числа из всех строк
+        const deliveryIds = lines
+            .map(line => line.match(/\b\d{10}\b/g))
+            .filter(Boolean)
+            .flat();
 
         return { courierName, deliveryIds };
     }
@@ -303,6 +306,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function startQrScanner() {
         try {
+            if (qrIcon) qrIcon.style.display = 'none'; // Скрываем иконку при открытии камеры
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
             const camera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0] || null;
