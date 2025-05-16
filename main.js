@@ -294,6 +294,8 @@ document.addEventListener("DOMContentLoaded", function () {
         modalContent.classList.add('archive-modal-content');
         archiveModalContent = modalContent;
         setModalContentWidth(modalContent);
+        // Не закрывать модалку при клике внутри окна
+        modalContent.addEventListener('click', e => e.stopPropagation());
 
         // === Ширина модального окна архива ===
         function setArchiveModalWidth() {
