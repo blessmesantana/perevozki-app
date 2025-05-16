@@ -369,6 +369,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
             async function loadArchiveForDate(date) {
                 archiveDataDiv.innerHTML = '';
+                // Получаем данные архива для выбранной даты
+                const deliveriesSnap = await get(ref(database, `archive/${date}/deliveries`));
+                const scansSnap = await get(ref(database, `archive/${date}/scans`));
+                let deliveries = [];
+                let scans = [];
+                if (deliveriesSnap.exists()) deliveries = deliveriesSnap.val();
+                if (scansSnap.exists()) scans = scansSnap.val();
+                // Преобразуем в массивы объектов
+                deliveries = Array.isArray(deliveries) ? deliveries : (deliveries ? Object.values(deliveries) : []);
+                scans = Array.isArray(scans) ? scans : (scans ? Object.values(scans) : []);
+                // Формируем списки
+                const scannedIds = new Set(scans.map(s => s.delivery_id || s.id));
+                const notScanned = deliveries.filter(d => !scannedIds.has(d.id));
+                const scannedList = deliveries.filter(d => scannedIds.has(d.id));
+                // Заголовки и списки
                 const notScannedTitle = document.createElement('div');
                 notScannedTitle.textContent = `Неотсканированные (${notScanned.length}):`;
                 notScannedTitle.className = 'archive-section-title';
@@ -393,6 +408,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     archiveDataDiv.innerHTML = '<div class="archive-empty">Нет данных за выбранную дату.</div>';
                 }
             }
+
             // При выборе даты
             dateInput.addEventListener('change', e => {
                 loadArchiveForDate(e.target.value);
