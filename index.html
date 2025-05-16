@@ -1,57 +1,58 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Scanner</title>
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Scanner</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
 </head>
 <body>
-  <div class="page">
-    <button id="sidebarToggle" class="sidebar-button" aria-label="Меню">☰</button>
-    <div id="sidebarMenu" class="sidebar-menu">
-      <button id="addDataButton">📥 Добавить данные</button>
-      <textarea id="rawData" placeholder="Введите данные"></textarea>
-      <button id="submitRawDataButton">📥 Сохранить данные</button>
-      <button id="showStatsButton">📊 Показать статистику</button>
-      <div id="statsContainer" style="display: none; max-height: 200px; overflow-y: auto; margin-top: 10px; padding: 10px; background: #3f51b5; border-radius: 5px;">
-        <h3>Статистика сканирований</h3>
-        <ul id="statsList"></ul>
-      </div>
+    <div class="page">
+        <button id="sidebarToggle" class="sidebar-button" aria-label="Меню">☰</button>
+        <div id="sidebarMenu" class="sidebar-menu">
+            <button id="addDataButton">📥 Добавить данные</button>
+            <textarea id="rawData" placeholder="Введите данные"></textarea>
+            <button id="submitRawDataButton">📥 Сохранить данные</button>
+            <button id="showStatsButton">📊 Показать статистику</button>
+            <div id="statsContainer" style="display: none; max-height: 200px; overflow-y: auto; margin-top: 10px; padding: 10px; background: #3f51b5; border-radius: 5px;">
+                <h3>Статистика сканирований</h3>
+                <ul id="statsList"></ul>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="inputModeButton" class="button-group-item">ID передачи</button>
+            <div id="manualInputContainer" class="button-group">
+                <input type="text" id="manualTransferId" placeholder="Введите ID">
+                <button id="manualSubmitButton" class="button-group-item">Отправить</button>
+            </div>
+        </div>
+
+        <div class="qr-container">
+            <div id="qr-reader">
+                <video id="qr-video"></video>
+            </div>
+            <svg class="qr-icon" width="80px" height="80px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="..." stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div id="loadingIndicator" class="loading-indicator">Сканирование...</div>
+        </div>
+
+        <div id="result" class="scan-result">
+            <div id="resultTransferId" class="transfer-id"></div>
+            <div id="resultCourier" class="courier-name"></div>
+            <div id="resultPrevious" class="previous-courier"></div>
+            <div id="resultStatus" class="status"></div>
+            <div id="resultRawData" class="raw-data"></div>
+        </div>
+
+        <button id="scanButton" class="scan-button">Сканировать QR код</button>
+        <div class="info-text">Сканируйте QR передачи или введите ID вручную</div>
     </div>
 
-    <div class="button-group">
-      <button id="inputModeButton" class="button-group-item">ID передачи</button>
-      <div id="manualInputContainer" class="button-group">
-        <input type="text" id="manualTransferId" placeholder="Введите ID">
-        <button id="manualSubmitButton" class="button-group-item">Отправить</button>
-      </div>
-    </div>
-
-    <div class="qr-container">
-      <div id="qr-reader">
-        <video id="qr-video"></video>
-      </div>
-      <svg class="qr-icon" width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M7 12H12V17 M3.01 12H3 M8.01 17H8 M12.01 21H12 M21.01 12H21 M3 17H4.5 M15.5 12H17.5 M3 21H8 M12 2V8 M17.6 21H19.4C19.9601 21 20.2401 21 20.454 20.891C20.6422 20.7951 20.7951 20.6422 20.891 20.454C21 20.2401 21 19.9601 21 19.4V17.6C21 17.0399 21 16.7599 20.891 16.546C20.7951 16.3578 20.6422 16.2049 20.454 16.109C20.2401 16 19.9601 16 19.4 16H17.6C17.0399 16 16.7599 16 16.546 16.109C16.3578 16.2049 16.2049 16.3578 16.109 16.546C16 16.7599 16 17.0399 16 17.6V19.4C16 19.9601 16 20.2401 16.109 20.454C16.2049 20.6422 16.3578 20.7951 16.546 20.891C16.7599 21 17.0399 21 17.6 21 Z" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <div id="loadingIndicator" class="loading-indicator">Сканирование...</div>
-    </div>
-
-    <div id="result" class="scan-result">
-      <div id="resultTransferId" class="transfer-id"></div>
-      <div id="resultCourier" class="courier-name"></div>
-      <div id="resultPrevious" class="previous-courier"></div>
-      <div id="resultStatus" class="status"></div>
-      <div id="resultRawData" class="raw-data"></div>
-    </div>
-
-    <button id="scanButton" class="scan-button">Сканировать QR код</button>
-    <div class="info-text">Сканируйте QR передачи или введите ID вручную</div>
-  </div>
-
-  <!-- ES-модули подключаются здесь -->
-  <script type="module" src="firebase.js"></script>
-  <script type="module" src="main.js"></script>
+    <!-- Модули теперь подключаются внизу -->
+    <script type="module" src="firebase.js"></script>
+    <script type="module" src="main.js"></script>
 </body>
 </html>
