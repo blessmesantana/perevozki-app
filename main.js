@@ -21,6 +21,8 @@ document.addEventListener("DOMContentLoaded", function () {
     const qrIcon = document.querySelector('.qr-icon');
     const loadingIndicator = document.getElementById('loadingIndicator');
 
+    if (qrIcon) qrIcon.style.display = 'block'; // Показываем иконку при загрузке
+
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebarMenu = document.getElementById('sidebarMenu');
     const addDataButton = document.getElementById('addDataButton');
@@ -36,37 +38,35 @@ document.addEventListener("DOMContentLoaded", function () {
     const scanDelay = 2000;
     let isProcessing = false;
 
-    // Показ сообщения
+    // Показ сообщения через toast
+    const toast = document.getElementById('toast');
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
-        resultDiv.className = `scan-result ${status}`;
-        let transferId = message;
-        const match = message.match(/\d{10}|\d{4}/);
-        if (match) transferId = match[0];
-
-        resultTransferId.textContent = transferId || '';
-        resultCourier.textContent = courier ? `Курьер: ${courier}` : '';
-        resultPrevious.textContent = previousCourier || '';
-        resultStatus.textContent = status === 'already_scanned' ? 'Повторное сканирование' :
-                                 status === 'success' ? 'Успешно' :
-                                 status === 'not_found' ? 'Не найдено' : message;
-        resultRawData.textContent = rawData ? `Сырые данные: ${rawData}` : '';
-        resultDiv.style.display = 'flex';
-
+        if (!toast) return;
+        let text = '';
+        if (status === 'already_scanned') {
+            text = `Повторное сканирование. ${message} ${courier ? 'Курьер: ' + courier : ''} ${previousCourier ? previousCourier : ''}`;
+        } else if (status === 'success') {
+            text = `Успешно. ${message ? 'ID: ' + message : ''} ${courier ? 'Курьер: ' + courier : ''}`;
+        } else if (status === 'not_found') {
+            text = `Не найдено. ${message ? 'ID: ' + message : ''}`;
+        } else if (status === 'error') {
+            text = message;
+        } else {
+            text = message;
+        }
+        toast.textContent = text.trim();
+        toast.className = `toast toast-show toast-${status}`;
         setTimeout(() => {
-            resultDiv.style.display = 'none';
-            if (status === 'success' || status === 'already_scanned') {
-                startQrScanner();
-            }
-        }, 5000);
+            toast.classList.remove('toast-show');
+        }, 2200);
+        resultDiv.style.display = 'none';
     }
 
     // Обработчики событий
     if (inputModeButton) {
         inputModeButton.addEventListener('click', () => {
             inputModeButton.classList.add('active');
-            manualSubmitButton.classList.add('active');
-            inputModeButton.style.display = 'none';
-            manualInputContainer.style.display = 'flex';
+            manualInputContainer.classList.add('active');
             stopQrScanner();
             manualTransferIdInput.focus();
         });

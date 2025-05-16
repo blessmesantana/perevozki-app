@@ -29,7 +29,9 @@ html {
     overflow: hidden;
 }
 
+/* --- Анимация для кнопки и поля ввода --- */
 .button-group {
+    position: relative;
     width: 100%;
     height: 40px;
     padding: 2px;
@@ -55,39 +57,30 @@ html {
     border: none;
 }
 
+#inputModeButton,
+#inputModeButton.active {
+    transition: background 0.5s, color 0.5s, transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 #inputModeButton {
     color: #5A6AD2;
     background: #FFFFFF;
+    z-index: 2;
+    position: relative;
+}
+
+#inputModeButton.active {
+    transform: translateX(-120%);
 }
 
 #manualSubmitButton {
     color: #2D3DA5;
     background: #C4CAEF;
     width: 100px;
-    opacity: 0;
-    transform: translateX(20px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
-}
-
-#inputModeButton.active {
-    transform: translateX(-50%);
-}
-
-#manualSubmitButton.active {
     opacity: 1;
-    transform: translateX(0);
-}
-
-#inputModeButton:hover,
-#manualSubmitButton:hover {
-    color: #ffffff;
-    background: #a0a9e5;
-}
-
-#inputModeButton:active,
-#manualSubmitButton:active {
-    color: #5a6ad2;
-    background: #ffffff;
+    transform: none;
+    transition: background 0.5s, color 0.5s;
+    vertical-align: middle;
 }
 
 #manualTransferId {
@@ -101,12 +94,34 @@ html {
     font-size: 14px;
     min-width: 120px;
     outline: none;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+#manualInputContainer,
+#manualInputContainer.active {
+    transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #manualInputContainer {
-    display: none;
-    flex: 1;
+    display: flex;
+    align-items: center;
     gap: 6px;
+    height: 36px;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 100%;
+    justify-content: flex-end;
+}
+
+#manualInputContainer.active {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .qr-container {
@@ -320,43 +335,195 @@ html {
     margin-top: 10px;
 }
 
-.sidebar-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: transparent;
-    border: none;
-    font-size: 24px;
-    color: white;
+/* --- Sidebar Hamburger Toggle --- */
+.sidebarIconToggle {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    height: 44px;
+    width: 44px;
+    z-index: 1201;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    z-index: 1001;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+    transition: background 0.2s;
+}
+.sidebarIconToggle:hover {
+    background: none;
 }
 
-.sidebar-menu {
+.sidebarIconToggle .diagonal,
+.sidebarIconToggle .horizontal {
     position: absolute;
-    top: 50px;
-    right: 10px;
-    background: #303f9f;
-    border-radius: 8px;
-    padding: 8px;
-    display: none;
-    z-index: 1000;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    height: 2.2px;
+    width: 26px;
+    background: white;
+    border-radius: 1.5px;
+    transition: all 0.35s cubic-bezier(0.4,0,0.2,1), top 0.35s cubic-bezier(0.4,0,0.2,1);
+    left: 9px;
+}
+.sidebarIconToggle .diagonal.part-1 {
+    top: 18px;
+    transform-origin: 50% 50%;
+}
+.sidebarIconToggle .horizontal {
+    top: 22px;
+    transform-origin: 50% 50%;
+}
+.sidebarIconToggle .diagonal.part-2 {
+    top: 26px;
+    transform-origin: 50% 50%;
 }
 
-.sidebar-menu button {
+input[type="checkbox"] {
+    display: none;
+}
+
+input[type="checkbox"]:checked ~ .sidebarIconToggle > .diagonal.part-1 {
+    top: 22px;
+    transform: rotate(45deg) scaleX(1.1);
+    background: #ea1e63;
+}
+input[type="checkbox"]:checked ~ .sidebarIconToggle > .horizontal {
+    opacity: 0;
+    transform: scaleX(0.5);
+}
+input[type="checkbox"]:checked ~ .sidebarIconToggle > .diagonal.part-2 {
+    top: 22px;
+    transform: rotate(-45deg) scaleX(1.1);
+    background: #ea1e63;
+}
+input[type="checkbox"]:not(:checked) ~ .sidebarIconToggle > .diagonal.part-1,
+input[type="checkbox"]:not(:checked) ~ .sidebarIconToggle > .diagonal.part-2 {
+    background: white;
+}
+
+/* --- Sidebar Menu Slide (right) --- */
+#sidebarMenu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 270px;
+    max-width: 90vw;
+    height: 100dvh;
+    background: rgba(57,73,171,0.85); /* полупрозрачный фон */
+    backdrop-filter: blur(10px); /* эффект blur */
+    -webkit-backdrop-filter: blur(18px); /* для Safari */
+    box-shadow: -2px 0 15px rgba(0,0,0,0.2);
+    border-radius: 18px 0 0 18px;
+    border-top-right-radius: 18px;
+    border-bottom-right-radius: 18px;
+    padding: 96px 20px 20px 20px;
+    transform: translateX(110%);
+    will-change: transform;
+    display: flex !important;
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+    z-index: 1200;
+    flex-direction: column;
+    align-items: flex-end;
+    font-family: 'Inter', sans-serif;
+    gap: 0;
+}
+input[type="checkbox"]:checked ~ #sidebarMenu {
+    transform: translateX(0);
+    pointer-events: auto;
+    opacity: 1;
+    transition: transform 0.4s cubic-bezier(0.4,0,0.2,1), opacity 0.3s;
+}
+
+#sidebarMenu, #sidebarMenu *, #sidebarMenu input, #sidebarMenu button {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    text-align: center;
+    letter-spacing: normal;
+    filter: none !important;
+}
+
+#sidebarMenu input[type="text"] {
+    color: #3949AB;
+    background: #fff;
+    border-radius: 18px;
+}
+#sidebarMenu form button[type="submit"] {
+    color: white;
+    background: #ea1e63;
+    border-radius: 18px;
+}
+#sidebarShowStatsButton {
+    color: white;
+}
+
+#sidebarMenu form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+#sidebarMenu input[type="text"] {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 18px;
+    border: none;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    outline: none;
+    box-sizing: border-box;
+    background: #fff;
+    color: #3949AB;
+    margin-bottom: 0;
+    text-align: center;
+}
+#sidebarMenu form button[type="submit"] {
+    width: 100%;
+    background: #ea1e63;
+    color: white;
+    border: none;
+    padding: 10px 0;
+    border-radius: 18px;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    margin-bottom: 0;
+    transition: background 0.2s;
+    text-align: center;
+    justify-content: center;
+}
+#sidebarMenu form button[type="submit"]:hover {
+    background: #c2185b;
+}
+#sidebarShowStatsButton {
+    width: 100%;
+    margin-top: 16px;
     background: none;
     border: none;
     color: white;
-    padding: 6px 12px;
-    text-align: left;
-    width: 100%;
-    font-size: 14px;
+    padding: 12px 0 10px 0;
+    font-size: 16px;
     cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    text-align: center !important;
+    justify-content: center !important;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+#sidebarShowStatsButton:hover {
+    background: #3f51b5;
 }
 
-.sidebar-menu button:hover {
-    background: #3f51b5;
+/* Убираем старые sidebar-button/sidebar-menu */
+.sidebar-button, .sidebar-menu {
+    display: none !important;
 }
 
 #rawData {
@@ -364,19 +531,21 @@ html {
     height: 150px;
     resize: none;
     padding: 1rem;
-    font-size: 1rem;
+    font-size: 14px;
     border: 1px solid #ccc;
     border-radius: 5px;
     margin-bottom: 1rem;
-    font-family: monospace;
+    font-family: 'Inter', monospace, sans-serif; /* основной шрифт + моно */
     background: white;
     color: black;
-    font-size: 14px;
+    text-align: center;
 }
 
 #statsContainer h3 {
     font-size: 14px;
     margin-bottom: 8px;
+    font-family: 'Inter', sans-serif;
+    text-align: center;
 }
 
 #statsList {
@@ -388,70 +557,48 @@ html {
     font-size: 12px;
     margin-bottom: 6px;
     word-wrap: break-word;
+    font-family: 'Inter', sans-serif;
+    text-align: center;
 }
 
-@media (max-width: 360px) {
-    .button-group {
-        width: calc(100% - 30px);
-    }
+#toast {
+    position: fixed;
+    top: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 220px;
+    max-width: 90vw;
+    z-index: 2000;
+    padding: 16px 28px;
+    border-radius: 18px;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: #fff;
+    background: #4caf50;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s, background 0.3s;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#toast.toast-show {
+    opacity: 1;
+    pointer-events: auto;
+}
+#toast.toast-success { background: #4caf50; }
+#toast.toast-error { background: #ea1e63; }
+#toast.toast-already_scanned { background: #ffc107; color: #222; }
+#toast.toast-not_found { background: #ea1e63; }
 
-    #manualSubmitButton {
-        width: 90px;
+@media (max-width: 480px) {
+    #toast {
+        min-width: 120px;
         font-size: 13px;
-    }
-
-    #manualTransferId {
-        font-size: 13px;
-        padding: 0 10px;
-    }
-
-    .qr-container {
-        width: 220px;
-        height: 220px;
-    }
-
-    .qr-container::before {
-        width: 160px;
-        height: 160px;
-    }
-
-    .qr-icon {
-        width: 60px;
-        height: 60px;
-    }
-
-    .scan-button {
-        width: 260px;
-    }
-
-    .scan-result {
-        width: 200px;
-        padding: 10px;
-        min-height: 50px;
-    }
-
-    .transfer-id {
-        font-size: 9px;
-        margin-bottom: 1px;
-    }
-
-    .courier-name {
-        font-size: 13px;
-        margin-bottom: 1px;
-    }
-
-    .previous-courier {
-        font-size: 11px;
-        margin-top: 1px;
-    }
-
-    .status {
-        font-size: 10px;
-        margin-top: 1px;
-    }
-
-    .raw-data {
-        font-size: 8px;
-        margin-top: 2px;
+        padding: 12px 10px;
+        top: 100px;
     }
 }

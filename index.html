@@ -10,13 +10,27 @@
     <script type="module" src="firebase.js"></script>
 </head>
 <body>
+    <div id="toast"></div>
+    <input type="checkbox" id="sidebarToggle" hidden />
+    <label class="sidebarIconToggle" for="sidebarToggle">
+      <div class="diagonal part-1"></div>
+      <div class="horizontal"></div>
+      <div class="diagonal part-2"></div>
+    </label>
+    <nav id="sidebarMenu">
+      <form id="sidebarDataForm" style="width:100%;display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <input type="text" id="sidebarDataInput" placeholder="Введите данные" style="width:100%;padding:8px 10px;border: radius 30px;border:none;font-size:14px;font-family:'Inter',sans-serif;outline:none;box-sizing:border-box;">
+        <button type="submit" style="width:100%;background:#ea1e63;color:white;border:none;padding:8px 0;border-radius:30px;font-size:14px;cursor:pointer;font-family:'Inter',sans-serif;">Сохранить</button>
+      </form>
+      <button id="sidebarShowStatsButton" style="width:100%;margin-top:12px;background:none;border:none;color:white;padding:10px 0;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;text-align:right;border-radius:6px;transition:background 0.2s;">Показать статистику</button>
+    </nav>
     <div class="page">
         <button id="sidebarToggle" class="sidebar-button">☰</button>
         <div id="sidebarMenu" class="sidebar-menu">
-            <button id="addDataButton">📥 Добавить данные</button>
+            <button id="addDataButton">Добавить данные</button>
             <textarea id="rawData" placeholder="Введите данные"></textarea>
-            <button id="submitRawDataButton">📥 Сохранить данные</button>
-            <button id="showStatsButton">📊 Показать статистику</button>
+            <button id="submitRawDataButton">Сохранить данные</button>
+            <button id="showStatsButton">Показать статистику</button>
             <div id="statsContainer" style="display: none; max-height: 200px; overflow-y: auto; margin-top: 10px; padding: 10px; background: #3f51b5; border-radius: 5px;">
                 <h3>Статистика сканирований</h3>
                 <ul id="statsList"></ul>
