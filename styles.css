@@ -14,6 +14,7 @@ html {
     color: white;
     overflow: hidden;
     touch-action: manipulation;
+    font-size: 13px;
 }
 
 .page {
@@ -27,6 +28,7 @@ html {
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    font-size: 13px;
 }
 
 /* --- Анимация для кнопки и поля ввода --- */
@@ -49,7 +51,7 @@ html {
     align-items: center;
     justify-content: center;
     font-family: 'Inter', sans-serif;
-    font-size: 14px;
+    font-size: 13px !important;
     font-weight: 400;
     border-radius: 18px;
     cursor: pointer;
@@ -60,6 +62,7 @@ html {
 #inputModeButton,
 #inputModeButton.active {
     transition: background 0.5s, color 0.5s, transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 13px !important;
 }
 
 #inputModeButton {
@@ -81,6 +84,7 @@ html {
     transform: none;
     transition: background 0.5s, color 0.5s;
     vertical-align: middle;
+    font-size: 13px !important;
 }
 
 #manualTransferId {
@@ -91,7 +95,7 @@ html {
     border-radius: 18px;
     background: white;
     color: #5a6ad2;
-    font-size: 14px;
+    font-size: 13px !important;
     min-width: 120px;
     outline: none;
     display: flex;
@@ -103,6 +107,7 @@ html {
 #manualInputContainer,
 #manualInputContainer.active {
     transition: opacity 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 13px !important;
 }
 
 #manualInputContainer {
@@ -136,6 +141,7 @@ html {
     margin: 20px 0;
     position: relative;
     --frame-color: #ea1e63;
+    font-size: 13px !important;
 }
 
 #qr-reader {
@@ -144,6 +150,7 @@ html {
     border: none;
     border-radius: 20px;
     overflow: hidden;
+    font-size: 13px !important;
 }
 
 #qr-reader video {
@@ -151,6 +158,7 @@ html {
     height: 100%;
     object-fit: fill;
     border-radius: 20px;
+    font-size: 13px !important;
 }
 
 .qr-container::before {
@@ -210,6 +218,7 @@ html {
     transform: translate(-50%, -50%);
     z-index: 11;
     pointer-events: none;
+    font-size: 13px !important;
 }
 
 #qr-reader:not(:empty) + .qr-icon {
@@ -222,7 +231,7 @@ html {
     left: 50%;
     transform: translate(-50%, -50%);
     color: white;
-    font-size: 14px;
+    font-size: 13px !important;
     font-weight: 500;
     background: rgba(0, 0, 0, 0.6);
     padding: 8px 16px;
@@ -246,6 +255,7 @@ html {
     min-height: 60px;
     overflow-wrap: break-word;
     white-space: normal;
+    font-size: 13px !important;
 }
 
 .scan-result.success {
@@ -266,14 +276,14 @@ html {
 }
 
 .transfer-id {
-    font-size: 10px;
+    font-size: 13px !important;
     margin-bottom: 2px;
     width: 100%;
     overflow-wrap: break-word;
 }
 
 .courier-name {
-    font-size: 14px;
+    font-size: 13px !important;
     font-weight: 500;
     margin-bottom: 2px;
     width: 100%;
@@ -281,7 +291,7 @@ html {
 }
 
 .previous-courier {
-    font-size: 12px;
+    font-size: 13px !important;
     opacity: 0.8;
     margin-top: 2px;
     width: 100%;
@@ -289,7 +299,7 @@ html {
 }
 
 .status {
-    font-size: 11px;
+    font-size: 13px !important;
     font-weight: bold;
     margin-top: 2px;
     width: 100%;
@@ -297,7 +307,7 @@ html {
 }
 
 .raw-data {
-    font-size: 9px;
+    font-size: 13px !important;
     opacity: 0.7;
     margin-top: 4px;
     width: 100%;
@@ -310,7 +320,7 @@ html {
     background: #ea1e63;
     border-radius: 28px;
     color: white;
-    font-size: 13px;
+    font-size: 13px !important;
     border: none;
     cursor: pointer;
     margin: 20px 0;
@@ -327,7 +337,7 @@ html {
 }
 
 .info-text {
-    font-size: 11px;
+    font-size: 13px !important;
     color: #aeb5e4;
     text-align: center;
     width: 100%;
@@ -351,6 +361,7 @@ html {
     border-radius: 0;
     box-shadow: none;
     transition: background 0.2s;
+    font-size: 13px !important;
 }
 .sidebarIconToggle:hover {
     background: none;
@@ -429,6 +440,7 @@ input[type="checkbox"]:not(:checked) ~ .sidebarIconToggle > .diagonal.part-2 {
     align-items: flex-end;
     font-family: 'Inter', sans-serif;
     gap: 0;
+    font-size: 13px !important;
 }
 input[type="checkbox"]:checked ~ #sidebarMenu {
     transform: translateX(0);
@@ -439,7 +451,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
 
 #sidebarMenu, #sidebarMenu *, #sidebarMenu input, #sidebarMenu button {
     font-family: 'Inter', sans-serif;
-    font-size: 13px;
+    font-size: 13px !important;
     font-weight: 500;
     color: #fff;
     text-align: center;
@@ -451,14 +463,17 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     color: #3949AB;
     background: #fff;
     border-radius: 18px;
+    font-size: 13px !important;
 }
 #sidebarMenu form button[type="submit"] {
     color: white;
     background: #ea1e63;
     border-radius: 18px;
+    font-size: 13px !important;
 }
 #sidebarShowStatsButton {
     color: white;
+    font-size: 13px !important;
 }
 
 #sidebarMenu form {
@@ -467,13 +482,14 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     flex-direction: column;
     align-items: center;
     gap: 8px;
+    font-size: 13px !important;
 }
 #sidebarMenu input[type="text"] {
     width: 100%;
     padding: 9px 12px;
     border-radius: 18px;
     border: none;
-    font-size: 15px;
+    font-size: 13px !important;
     font-family: 'Inter', sans-serif;
     outline: none;
     box-sizing: border-box;
@@ -489,7 +505,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     border: none;
     padding: 10px 0;
     border-radius: 18px;
-    font-size: 15px;
+    font-size: 13px !important;
     cursor: pointer;
     font-family: 'Inter', sans-serif;
     margin-bottom: 0;
@@ -507,7 +523,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     border: none;
     color: white;
     padding: 12px 0 10px 0;
-    font-size: 16px;
+    font-size: 13px !important;
     cursor: pointer;
     font-family: 'Inter', sans-serif;
     text-align: center !important;
@@ -531,7 +547,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     height: 150px;
     resize: none;
     padding: 1rem;
-    font-size: 14px;
+    font-size: 13px !important;
     border: 1px solid #ccc;
     border-radius: 5px;
     margin-bottom: 1rem;
@@ -542,7 +558,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
 }
 
 #statsContainer h3 {
-    font-size: 14px;
+    font-size: 13px !important;
     margin-bottom: 8px;
     font-family: 'Inter', sans-serif;
     text-align: center;
@@ -551,10 +567,11 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
 #statsList {
     list-style: none;
     padding: 0;
+    font-size: 13px !important;
 }
 
 #statsList li {
-    font-size: 12px;
+    font-size: 13px !important;
     margin-bottom: 6px;
     word-wrap: break-word;
     font-family: 'Inter', sans-serif;
@@ -572,7 +589,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     opacity: 0;
     transition: opacity 0.3s;
     font-family: 'Inter', sans-serif;
-    font-size: 16px;
+    font-size: 13px !important;
     font-weight: 500;
     min-width: 80px;
     max-width: 100vw;
@@ -589,7 +606,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     max-width: 90%;
     text-align: center;
     box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-    font-size: 15px;
+    font-size: 13px !important;
     font-weight: 500;
     line-height: 1.3;
     pointer-events: auto;
@@ -603,7 +620,7 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
 
 @media (max-width: 480px) {
     #qr-result-overlay .qr-overlay-box {
-        font-size: 13px;
+        font-size: 13px !important;
         padding: 10px 8px;
     }
 }
@@ -615,11 +632,11 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
 
     #manualSubmitButton {
         width: 90px;
-        font-size: 13px;
+        font-size: 13px !important;
     }
 
     #manualTransferId {
-        font-size: 13px;
+        font-size: 13px !important;
         padding: 0 10px;
     }
 
@@ -649,27 +666,27 @@ input[type="checkbox"]:checked ~ #sidebarMenu {
     }
 
     .transfer-id {
-        font-size: 9px;
+        font-size: 13px !important;
         margin-bottom: 1px;
     }
 
     .courier-name {
-        font-size: 13px;
+        font-size: 13px !important;
         margin-bottom: 1px;
     }
 
     .previous-courier {
-        font-size: 11px;
+        font-size: 13px !important;
         margin-top: 1px;
     }
 
     .status {
-        font-size: 10px;
+        font-size: 13px !important;
         margin-top: 1px;
     }
 
     .raw-data {
-        font-size: 8px;
+        font-size: 13px !important;
         margin-top: 2px;
     }
 }
@@ -680,7 +697,7 @@ input[type="date"] {
   border: none;
   border-radius: 10px;
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 13px !important;
   padding: 7px 0 7px 10px;
   outline: none;
   box-shadow: 0 1px 4px rgba(0,0,0,0.08);
@@ -696,4 +713,126 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 input[type="date"]:focus {
   background: #283593;
   color: #fff;
+}
+
+/* --- СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА АРХИВА --- */
+.archive-modal-content {
+    background: #3f51b5 !important;
+    border-radius: 32px !important;
+    color: #fff !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+}
+.archive-modal-content input[type="date"] {
+    background: #283593 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 13px !important;
+    padding: 9px 12px !important;
+    outline: none !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 18px !important;
+    text-align: left;
+    transition: background 0.2s, color 0.2s;
+}
+.archive-modal-content input[type="date"]::-webkit-input-placeholder { color: #fff; }
+.archive-modal-content input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.5);
+}
+.archive-modal-content input[type="date"]:focus {
+  background: #1a237e !important;
+  color: #fff !important;
+}
+.archive-modal-content .archive-section-title {
+    font-weight: 600;
+    color: #fff;
+    margin: 10px 0 4px 0;
+    font-size: 13px !important;
+}
+.archive-modal-content .archive-list-item {
+    font-size: 13px !important;
+    color: #e3e8ff;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 4px 10px;
+    margin-bottom: 2px;
+    font-family: 'Inter', sans-serif;
+}
+.archive-modal-content .archive-list-item.scanned {
+    opacity: 0.6;
+    color: #bfc7e6;
+}
+.archive-modal-content .archive-list-item.not-scanned {
+    opacity: 1;
+    color: #fff;
+}
+.archive-modal-content .archive-empty {
+    color: #bfc7e6;
+    margin: 20px 0;
+    font-size: 13px !important;
+}
+.archive-modal-content .archive-move-btn {
+    background: #ea1e63;
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    font-size: 13px !important;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    padding: 12px 0 10px 0;
+    width: 100%;
+    margin-top: 18px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.archive-modal-content .archive-move-btn:hover {
+    background: #c2185b;
+}
+.archive-modal-content .archive-confirm-box {
+    background: #3f51b5;
+    border-radius: 24px;
+    color: #fff;
+    font-size: 13px !important;
+    font-family: 'Inter', sans-serif;
+    padding: 28px 20px;
+    min-width: 220px;
+    max-width: 90vw;
+    text-align: center;
+}
+.archive-modal-content .archive-confirm-btn {
+    background: #ea1e63;
+    color: #fff;
+    border: none;
+    border-radius: 18px;
+    font-size: 13px !important;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    padding: 10px 0;
+    width: 100%;
+    cursor: pointer;
+    margin-bottom: 10px;
+    transition: background 0.2s;
+}
+.archive-modal-content .archive-confirm-btn:hover {
+    background: #c2185b;
+}
+.archive-modal-content .archive-cancel-btn {
+    background: none;
+    color: #fff;
+    border: 1px solid #fff;
+    border-radius: 18px;
+    font-size: 13px !important;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    padding: 10px 0;
+    width: 100%;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+.archive-modal-content .archive-cancel-btn:hover {
+    background: #fff;
+    color: #3f51b5;
 }

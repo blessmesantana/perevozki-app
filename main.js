@@ -59,15 +59,28 @@ document.addEventListener("DOMContentLoaded", function () {
         qrResultOverlay.style.width = `${buttonWidth}px`;
     }
 
-    // --- Корректировка ширины overlay при изменении размера окна ---
-    function updateOverlayWidth() {
+    // === ФУНКЦИЯ ДЛЯ СИНХРОНИЗАЦИИ ШИРИНЫ МОДАЛЬНЫХ ОКОН ===
+    function setModalContentWidth(modalContent) {
+        if (!inputModeButton || !modalContent) return;
+        const buttonWidth = inputModeButton.offsetWidth;
+        modalContent.style.width = buttonWidth + 'px';
+        modalContent.style.minWidth = buttonWidth + 'px';
+        modalContent.style.maxWidth = buttonWidth + 'px';
+    }
+
+    function syncOverlayStyles() {
         if (inputModeButton && qrResultOverlay) {
-            const buttonWidth = inputModeButton.offsetWidth;
-            qrResultOverlay.style.width = `${buttonWidth}px`;
+            const buttonStyles = window.getComputedStyle(inputModeButton);
+            qrResultOverlay.style.width = buttonStyles.width;
+            qrResultOverlay.style.borderRadius = buttonStyles.borderRadius;
+            qrResultOverlay.style.padding = buttonStyles.padding;
+            qrResultOverlay.style.fontFamily = buttonStyles.fontFamily;
+            qrResultOverlay.style.fontSize = buttonStyles.fontSize;
+            qrResultOverlay.style.fontWeight = buttonStyles.fontWeight;
+            qrResultOverlay.style.boxShadow = buttonStyles.boxShadow;
+            qrResultOverlay.style.margin = buttonStyles.margin;
         }
     }
-    window.addEventListener('resize', updateOverlayWidth);
-    updateOverlayWidth();
 
     // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
@@ -253,6 +266,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // === МОДАЛЬНОЕ ОКНО АРХИВА ===
     let archiveModal = null;
+    let archiveModalContent = null;
     archiveButton.addEventListener('click', async () => {
         if (archiveModal) archiveModal.remove();
         archiveModal = document.createElement('div');
@@ -272,14 +286,29 @@ document.addEventListener("DOMContentLoaded", function () {
         modalContent.style.background = '#3f51b5';
         modalContent.style.borderRadius = '32px';
         modalContent.style.padding = '32px 24px';
-        modalContent.style.minWidth = '260px';
-        modalContent.style.maxWidth = '90vw';
         modalContent.style.color = 'white';
         modalContent.style.textAlign = 'center';
         modalContent.style.position = 'relative';
         modalContent.style.fontFamily = 'Inter, sans-serif';
         modalContent.style.fontSize = '13px';
-        modalContent.addEventListener('click', e => e.stopPropagation());
+        modalContent.classList.add('archive-modal-content');
+        archiveModalContent = modalContent;
+        setModalContentWidth(modalContent);
+
+        // === Ширина модального окна архива ===
+        function setArchiveModalWidth() {
+            if (inputModeButton) {
+                const w = inputModeButton.offsetWidth;
+                modalContent.style.width = w + 'px';
+                modalContent.style.minWidth = w + 'px';
+                modalContent.style.maxWidth = w + 'px';
+            } else {
+                modalContent.style.minWidth = '260px';
+                modalContent.style.maxWidth = '90vw';
+            }
+        }
+        setArchiveModalWidth();
+        window.addEventListener('resize', setArchiveModalWidth);
 
         // Заголовок
         const title = document.createElement('div');
@@ -322,6 +351,7 @@ document.addEventListener("DOMContentLoaded", function () {
             dateInput.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
             dateInput.style.outline = 'none';
             dateInput.style.textAlign = 'left';
+            dateInput.classList.add('archive-date-input');
             // Ограничим выбор только существующими датами
             dateInput.min = dateList[dateList.length-1];
             dateInput.max = dateList[0];
@@ -332,58 +362,33 @@ document.addEventListener("DOMContentLoaded", function () {
             const archiveDataDiv = document.createElement('div');
             archiveDataDiv.style.marginTop = '10px';
             archiveDataDiv.style.textAlign = 'left';
+            archiveDataDiv.classList.add('archive-data-div');
             modalContent.appendChild(archiveDataDiv);
 
             async function loadArchiveForDate(date) {
-                archiveDataDiv.innerHTML = '<div style="margin:10px 0;">Загрузка...</div>';
-                // Получаем deliveries и scans за выбранную дату
-                const [delSnap, scanSnap] = await Promise.all([
-                    get(ref(database, `archive/${date}/deliveries`)),
-                    get(ref(database, `archive/${date}/scans`))
-                ]);
-                const deliveries = [];
-                if (delSnap.exists()) {
-                    delSnap.forEach(child => deliveries.push(child.val()));
-                }
-                const scans = [];
-                if (scanSnap.exists()) {
-                    scanSnap.forEach(child => scans.push(child.val()));
-                }
-                // Группируем сканы по delivery_id
-                const scannedSet = new Set(scans.map(s => s.delivery_id));
-                // Неотсканированные и отсканированные
-                const notScanned = deliveries.filter(d => !scannedSet.has(d.id));
-                const scannedList = deliveries.filter(d => scannedSet.has(d.id));
-                // Выводим
                 archiveDataDiv.innerHTML = '';
                 const notScannedTitle = document.createElement('div');
                 notScannedTitle.textContent = `Неотсканированные (${notScanned.length}):`;
-                notScannedTitle.style.margin = '10px 0 4px 0';
-                notScannedTitle.style.fontWeight = '500';
+                notScannedTitle.className = 'archive-section-title';
                 archiveDataDiv.appendChild(notScannedTitle);
                 notScanned.forEach(d => {
                     const el = document.createElement('div');
                     el.textContent = `${d.id} (${d.courier_name})`;
-                    el.style.fontSize = '13px';
-                    el.style.opacity = '1';
-                    el.style.fontFamily = 'Inter, sans-serif';
+                    el.className = 'archive-list-item not-scanned';
                     archiveDataDiv.appendChild(el);
                 });
                 const scannedTitle = document.createElement('div');
                 scannedTitle.textContent = `Отсканированные (${scannedList.length}):`;
-                scannedTitle.style.margin = '14px 0 4px 0';
-                scannedTitle.style.fontWeight = '500';
+                scannedTitle.className = 'archive-section-title';
                 archiveDataDiv.appendChild(scannedTitle);
                 scannedList.forEach(d => {
                     const el = document.createElement('div');
                     el.textContent = `${d.id} (${d.courier_name})`;
-                    el.style.fontSize = '13px';
-                    el.style.opacity = '0.6';
-                    el.style.fontFamily = 'Inter, sans-serif';
+                    el.className = 'archive-list-item scanned';
                     archiveDataDiv.appendChild(el);
                 });
                 if (notScanned.length === 0 && scannedList.length === 0) {
-                    archiveDataDiv.innerHTML = '<div style="margin:10px 0;">Нет данных за выбранную дату.</div>';
+                    archiveDataDiv.innerHTML = '<div class="archive-empty">Нет данных за выбранную дату.</div>';
                 }
             }
             // При выборе даты
@@ -393,12 +398,141 @@ document.addEventListener("DOMContentLoaded", function () {
             // По умолчанию — первая дата
             loadArchiveForDate(dateInput.value);
         }
+
+        // === КНОПКА ПЕРЕНОСА В АРХИВ ===
+        const moveToArchiveBtn = document.createElement('button');
+        moveToArchiveBtn.textContent = 'Перенести в архив';
+        moveToArchiveBtn.style.background = '#ea1e63';
+        moveToArchiveBtn.style.color = '#fff';
+        moveToArchiveBtn.style.border = 'none';
+        moveToArchiveBtn.style.borderRadius = '18px';
+        moveToArchiveBtn.style.fontSize = '13px';
+        moveToArchiveBtn.style.fontWeight = '500';
+        moveToArchiveBtn.style.fontFamily = 'Inter, sans-serif';
+        moveToArchiveBtn.style.padding = '12px 0 10px 0';
+        moveToArchiveBtn.style.width = '100%';
+        moveToArchiveBtn.style.marginTop = '18px';
+        moveToArchiveBtn.style.cursor = 'pointer';
+        moveToArchiveBtn.classList.add('archive-move-btn');
+        modalContent.appendChild(moveToArchiveBtn);
+
+        moveToArchiveBtn.addEventListener('click', async () => {
+            // Окно подтверждения
+            const confirmModal = document.createElement('div');
+            confirmModal.style.position = 'fixed';
+            confirmModal.style.top = '0';
+            confirmModal.style.left = '0';
+            confirmModal.style.width = '100vw';
+            confirmModal.style.height = '100vh';
+            confirmModal.style.background = 'rgba(0,0,0,0.7)';
+            confirmModal.style.display = 'flex';
+            confirmModal.style.alignItems = 'center';
+            confirmModal.style.justifyContent = 'center';
+            confirmModal.style.zIndex = '10000';
+            confirmModal.addEventListener('click', () => confirmModal.remove());
+
+            const confirmBox = document.createElement('div');
+            confirmBox.style.background = '#3f51b5';
+            confirmBox.style.borderRadius = '24px';
+            confirmBox.style.padding = '28px 20px';
+            confirmBox.style.color = 'white';
+            confirmBox.style.textAlign = 'center';
+            confirmBox.style.position = 'relative';
+            confirmBox.style.fontFamily = 'Inter, sans-serif';
+            confirmBox.style.fontSize = '15px';
+            confirmBox.classList.add('archive-confirm-box');
+            // === Ширина окна подтверждения ===
+            function setConfirmBoxWidth() {
+                if (inputModeButton) {
+                    const w = inputModeButton.offsetWidth;
+                    confirmBox.style.width = w + 'px';
+                    confirmBox.style.minWidth = w + 'px';
+                    confirmBox.style.maxWidth = w + 'px';
+                } else {
+                    confirmBox.style.minWidth = '220px';
+                    confirmBox.style.maxWidth = '90vw';
+                }
+            }
+            setConfirmBoxWidth();
+            window.addEventListener('resize', setConfirmBoxWidth);
+
+            confirmBox.innerHTML = '<div style="margin-bottom:18px;">Вы уверены, что хотите перенести все данные в архив?<br><span style="font-size:13px;opacity:0.7;">(deliveries и scans будут очищены)</span></div>';
+            const yesBtn = document.createElement('button');
+            yesBtn.textContent = 'Да, перенести';
+            yesBtn.style.background = '#ea1e63';
+            yesBtn.style.color = '#fff';
+            yesBtn.style.border = 'none';
+            yesBtn.style.borderRadius = '18px';
+            yesBtn.style.fontSize = '13px';
+            yesBtn.style.fontWeight = '500';
+            yesBtn.style.fontFamily = 'Inter, sans-serif';
+            yesBtn.style.padding = '10px 0';
+            yesBtn.style.width = '100%';
+            yesBtn.style.cursor = 'pointer';
+            yesBtn.style.marginBottom = '10px';
+            yesBtn.classList.add('archive-confirm-btn');
+            const noBtn = document.createElement('button');
+            noBtn.textContent = 'Отмена';
+            noBtn.style.background = 'none';
+            noBtn.style.color = '#fff';
+            noBtn.style.border = '1px solid #fff';
+            noBtn.style.borderRadius = '18px';
+            noBtn.style.fontSize = '13px';
+            noBtn.style.fontWeight = '500';
+            noBtn.style.fontFamily = 'Inter, sans-serif';
+            noBtn.style.padding = '10px 0';
+            noBtn.style.width = '100%';
+            noBtn.style.cursor = 'pointer';
+            noBtn.classList.add('archive-cancel-btn');
+            confirmBox.appendChild(yesBtn);
+            confirmBox.appendChild(noBtn);
+            confirmModal.appendChild(confirmBox);
+            document.body.appendChild(confirmModal);
+            noBtn.addEventListener('click', () => confirmModal.remove());
+            yesBtn.addEventListener('click', async () => {
+                yesBtn.disabled = true;
+                yesBtn.textContent = 'Перенос...';
+                // Получаем все deliveries и scans
+                try {
+                    const [delSnap, scanSnap] = await Promise.all([
+                        get(ref(database, 'deliveries')),
+                        get(ref(database, 'scans'))
+                    ]);
+                    const deliveries = [];
+                    if (delSnap.exists()) delSnap.forEach(child => deliveries.push(child.val()));
+                    const scans = [];
+                    if (scanSnap.exists()) scanSnap.forEach(child => scans.push(child.val()));
+                    // Дата для архива
+                    const now = new Date();
+                    const pad = n => n.toString().padStart(2, '0');
+                    const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+                    // Записываем в archive
+                    await set(ref(database, `archive/${dateStr}/deliveries`), deliveries);
+                    await set(ref(database, `archive/${dateStr}/scans`), scans);
+                    // Очищаем deliveries и scans
+                    await set(ref(database, 'deliveries'), null);
+                    await set(ref(database, 'scans'), null);
+                    yesBtn.textContent = 'Готово!';
+                    setTimeout(() => {
+                        confirmModal.remove();
+                        archiveModal.remove();
+                        window.showMessage('success', '', '', '', 'Данные перенесены в архив!');
+                    }, 1200);
+                } catch (e) {
+                    yesBtn.textContent = 'Ошибка!';
+                    yesBtn.style.background = '#ea1e63';
+                    setTimeout(() => confirmModal.remove(), 2000);
+                }
+            });
+        });
+
         archiveModal.appendChild(modalContent);
         document.body.appendChild(archiveModal);
     });
 
     // Модальное окно для вывода статистики по курьеру (оставляем как было)
     let courierStatsModal = null;
+    let courierStatsModalContent = null;
     function showCourierStatsModal(courierName) {
         if (courierStatsModal) courierStatsModal.remove();
         courierStatsModal = document.createElement('div');
@@ -418,14 +552,13 @@ document.addEventListener("DOMContentLoaded", function () {
         modalContent.style.background = '#3f51b5';
         modalContent.style.borderRadius = '32px';
         modalContent.style.padding = '32px 24px';
-        modalContent.style.minWidth = '260px';
-        modalContent.style.maxWidth = '90vw';
         modalContent.style.color = 'white';
         modalContent.style.textAlign = 'center';
         modalContent.style.position = 'relative';
         modalContent.style.fontFamily = 'Inter, sans-serif';
         modalContent.style.fontSize = '13px';
-        modalContent.addEventListener('click', e => e.stopPropagation());
+        courierStatsModalContent = modalContent;
+        setModalContentWidth(modalContent);
 
         const title = document.createElement('div');
         title.textContent = courierName;
@@ -529,14 +662,13 @@ document.addEventListener("DOMContentLoaded", function () {
         modalContent.style.background = '#3f51b5';
         modalContent.style.borderRadius = '32px';
         modalContent.style.padding = '32px 24px';
-        modalContent.style.minWidth = '260px';
-        modalContent.style.maxWidth = '90vw';
         modalContent.style.color = 'white';
         modalContent.style.textAlign = 'center';
         modalContent.style.position = 'relative';
         modalContent.style.fontFamily = 'Inter, sans-serif';
         modalContent.style.fontSize = '13px';
-        modalContent.addEventListener('click', e => e.stopPropagation());
+        setModalContentWidth(modalContent);
+
         const title = document.createElement('div');
         title.textContent = 'Выберите курьера';
         title.style.fontSize = '13px';
@@ -568,6 +700,19 @@ document.addEventListener("DOMContentLoaded", function () {
         selectModal.appendChild(modalContent);
         document.body.appendChild(selectModal);
     });
+
+    // === ОБНОВЛЕНИЕ ШИРИНЫ И СТИЛЕЙ МОДАЛОК И ВСПЛЫВАЮЩИХ ОКОН ПРИ РЕСАЙЗЕ ===
+    function updateAllModalWidths() {
+        setModalContentWidth(archiveModalContent);
+        setModalContentWidth(courierStatsModalContent);
+        // Для selectModal ищем по классу, т.к. он создается динамически
+        const selectModalContent = document.querySelector('.select-modal-content');
+        if (selectModalContent) setModalContentWidth(selectModalContent);
+        // Для всплывающего окна результата
+        syncOverlayStyles();
+    }
+    window.addEventListener('resize', updateAllModalWidths);
+    updateAllModalWidths();
 
     // Функции
     function parseRawData(text) {
