@@ -369,10 +369,12 @@ document.addEventListener("DOMContentLoaded", function () {
         loadingIndicator.style.display = 'block';
 
         try {
-            const cleanedId = transferId.replace(/[^\d]/g, '');
+            // Из QR берем только первое 10-значное число
+            const match = transferId.match(/\b\d{10}\b/);
+            const cleanedId = match ? match[0] : '';
 
-            if (cleanedId.length !== 4 && cleanedId.length !== 10) {
-                showMessage('error', 'Неверный формат ID', '', '', '');
+            if (!cleanedId) {
+                showMessage('error', 'Неверный формат QR', '', '', '');
                 isProcessing = false;
                 return;
             }
