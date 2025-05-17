@@ -53,6 +53,19 @@ document.addEventListener("DOMContentLoaded", function () {
     const scanDelay = 2000;
     let isProcessing = false;
 
+    // === Защита: Проверка наличия важных DOM-элементов ===
+    if (!sidebarMenu) console.warn('sidebarMenu не найден!');
+    if (!sidebarToggle) console.warn('sidebarToggle не найден!');
+    if (!addDataButton) console.warn('addDataButton не найден!');
+    if (!submitRawDataButton) console.warn('submitRawDataButton не найден!');
+    if (!showStatsButton) console.warn('showStatsButton не найден!');
+    if (!statsContainer) console.warn('statsContainer не найден!');
+    if (!statsList) console.warn('statsList не найден!');
+    if (!rawDataInput) console.warn('rawDataInput не найден!');
+    if (!sidebarDataForm) console.warn('sidebarDataForm не найден!');
+    if (!sidebarDataInput) console.warn('sidebarDataInput не найден!');
+    if (!sidebarMenuNav) console.warn('sidebarMenuNav не найден!');
+
     // Dynamically adjust the overlay width to match the button
     if (inputModeButton && qrResultOverlay) {
         const buttonWidth = inputModeButton.offsetWidth;
@@ -146,14 +159,31 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', () => {
-            sidebarMenu.style.display = sidebarMenu.style.display === 'block' ? 'none' : 'block';
-        });
+    // === Сайдбар: только чекбокс+label, без JS-открытия ===
+    // Удаляем JS-обработчик sidebarToggle, работаем только с чекбоксом
+    // === Закрытие сайдбара по клику вне его ===
+    function handleSidebarClose(e) {
+        const sidebarMenu = document.getElementById('sidebarMenu');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        if (!sidebarMenu || !sidebarToggle) return;
+        // Проверяем открыт ли сайдбар (чекбокс активен)
+        const isOpen = sidebarToggle.checked;
+        // Если клик вне меню и вне label (крестика/бургера)
+        const label = document.querySelector('label[for="sidebarToggle"]');
+        if (
+            isOpen &&
+            !sidebarMenu.contains(e.target) &&
+            (!label || !label.contains(e.target))
+        ) {
+            sidebarToggle.checked = false;
+        }
     }
+    document.addEventListener('mousedown', handleSidebarClose);
+    document.addEventListener('touchstart', handleSidebarClose);
 
     if (addDataButton) {
         addDataButton.addEventListener('click', async () => {
+            if (!sidebarMenu || !rawDataInput || !submitRawDataButton || !statsContainer) return;
             sidebarMenu.style.display = 'block';
             rawDataInput.style.display = 'block';
             submitRawDataButton.style.display = 'block';
@@ -163,33 +193,47 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (submitRawDataButton) {
         submitRawDataButton.addEventListener('click', async () => {
+            if (!rawDataInput) return;
             const rawData = rawDataInput.value.trim();
             if (!rawData) {
                 showMessage('error', 'Введите данные', '', '', '');
                 return;
             }
-
-            const { courierName, deliveryIds } = parseRawData(rawData);
+            let courierName, deliveryIds;
+            try {
+                ({ courierName, deliveryIds } = parseRawData(rawData));
+            } catch (e) {
+                showMessage('error', 'Ошибка разбора данных', '', '', '');
+                return;
+            }
             if (!courierName) {
                 showMessage('error', 'Не найдено имя курьера', '', '', '');
                 return;
             }
-            if (deliveryIds.length === 0) {
+            if (!deliveryIds || deliveryIds.length === 0) {
                 showMessage('error', 'Не найдены номера передач', '', '', '');
                 return;
             }
-
-            await saveCourierAndDeliveries(courierName, deliveryIds);
+            try {
+                await saveCourierAndDeliveries(courierName, deliveryIds);
+            } catch (e) {
+                showMessage('error', 'Ошибка сохранения данных', '', '', '');
+            }
             rawDataInput.value = '';
         });
     }
 
     if (showStatsButton) {
         showStatsButton.addEventListener('click', async () => {
+            if (!rawDataInput || !submitRawDataButton || !statsContainer) return;
             rawDataInput.style.display = 'none';
             submitRawDataButton.style.display = 'none';
             statsContainer.style.display = 'block';
-            await loadStats();
+            try {
+                await loadStats();
+            } catch (e) {
+                showMessage('error', 'Ошибка загрузки статистики', '', '', '');
+            }
         });
     }
 
@@ -201,16 +245,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 showMessage('error', 'Введите данные', '', '', '');
                 return;
             }
-            const { courierName, deliveryIds } = parseRawData(text);
+            let courierName, deliveryIds;
+            try {
+                ({ courierName, deliveryIds } = parseRawData(text));
+            } catch (e) {
+                showMessage('error', 'Ошибка разбора данных', '', '', '');
+                return;
+            }
             if (!courierName) {
                 showMessage('error', 'Не найдено имя курьера', '', '', '');
                 return;
             }
-            if (deliveryIds.length === 0) {
+            if (!deliveryIds || deliveryIds.length === 0) {
                 showMessage('error', 'Не найдены номера передач', '', '', '');
                 return;
             }
-            await saveCourierAndDeliveries(courierName, deliveryIds);
+            try {
+                await saveCourierAndDeliveries(courierName, deliveryIds);
+            } catch (e) {
+                showMessage('error', 'Ошибка сохранения данных', '', '', '');
+            }
             sidebarDataInput.value = '';
         });
     }
@@ -639,8 +693,9 @@ document.addEventListener("DOMContentLoaded", function () {
             scannedList.forEach(id => {
                 const el = document.createElement('div');
                 el.textContent = id;
-                el.style.fontSize = '13px';
+                el.classList.add('scanned'); // Класс для перечеркивания и прозрачности
                 el.style.opacity = '0.6';
+                el.style.fontSize = '13px';
                 el.style.transition = 'opacity 0.3s';
                 el.style.fontFamily = 'Inter, sans-serif';
                 list.appendChild(el);
@@ -734,6 +789,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Функции
     function parseRawData(text) {
+        if (!text || typeof text !== 'string') return { courierName: '', deliveryIds: [] };
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
@@ -752,28 +808,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function saveCourierAndDeliveries(courierName, deliveryIds) {
-        if (!courierName || deliveryIds.length === 0) {
+        if (!courierName || !deliveryIds || deliveryIds.length === 0) {
             showMessage('error', 'Нет данных для сохранения', '', '', '');
             return;
         }
-
         try {
             console.log('Сохранение курьера:', courierName, 'и передач:', deliveryIds);
-
             const couriersRef = ref(database, 'couriers');
             const deliveriesRef = ref(database, 'deliveries');
-
             const newCourierRef = push(couriersRef);
             await set(newCourierRef, {
                 name: courierName,
                 timestamp: Date.now()
             });
-
             const courierId = newCourierRef.key;
-
+            if (!courierId) throw new Error('Не удалось получить ID курьера');
             console.log('Курьер сохранен с ID:', courierId);
-
             for (const id of deliveryIds) {
+                if (!id) continue;
                 const newDeliveryRef = push(deliveriesRef);
                 await set(newDeliveryRef, {
                     id,
@@ -781,10 +833,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     courier_name: courierName,
                     timestamp: Date.now()
                 });
-
                 console.log('Передача сохранена с ID:', id);
             }
-
             showMessage('success', '', `Добавлен курьер: ${courierName}`, `Передач: ${deliveryIds.length}`);
         } catch (e) {
             console.error("Ошибка сохранения в Firebase: ", e);
@@ -794,30 +844,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function startQrScanner() {
         try {
-            if (qrIcon) qrIcon.style.display = 'none'; // Скрываем иконку при открытии камеры
+            if (!qrIcon) throw new Error('qrIcon не найден');
+            qrIcon.style.display = 'none'; // Скрываем иконку при открытии камеры
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
-            const camera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0] || null;
-
+            const camera = cameras.find(c => c.label && c.label.toLowerCase().includes('back')) || cameras[0] || null;
             if (!camera) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
-                qrIcon.style.display = 'block';
+                if (qrIcon) qrIcon.style.display = 'block';
                 return;
             }
-
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { exact: "environment" } // Приоритет задней камеры
+                    facingMode: { exact: "environment" }
                 }
             });
-
+            if (!videoElement) throw new Error('videoElement не найден');
             videoElement.srcObject = stream;
             await videoElement.play();
-
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
-
             codeReader.decodeFromVideoDevice(camera.deviceId, 'qr-video', (result, err) => {
                 if (result) {
                     onScanSuccess(result.getText());
@@ -831,8 +878,8 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         } catch (err) {
             console.error('Ошибка камеры:', err.name, err.message, err.constraint);
-            showMessage('error', 'Ошибка камеры: ' + err.message, '', '', '');
-            qrIcon.style.display = 'block';
+            showMessage('error', 'Ошибка камеры: ' + (err.message || err), '', '', '');
+            if (qrIcon) qrIcon.style.display = 'block';
         }
     }
 
@@ -854,7 +901,7 @@ document.addEventListener("DOMContentLoaded", function () {
     async function processTransferId(transferId) {
         if (isProcessing) return;
         isProcessing = true;
-        loadingIndicator.style.display = 'block';
+        if (loadingIndicator) loadingIndicator.style.display = 'block';
 
         try {
             // Из QR берем только первое 10-значное число
@@ -892,13 +939,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 let duplicate = false;
                 let prevCourier = '';
 
-                scansSnapshot.forEach(scanSnap => {
-                    const scanData = scanSnap.val();
-                    if (scanData.delivery_id === cleanedId) {
-                        duplicate = true;
-                        prevCourier = scanData.courier_name;
-                    }
-                });
+                if (scansSnapshot.exists()) {
+                    scansSnapshot.forEach(scanSnap => {
+                        const scanData = scanSnap.val();
+                        if (scanData.delivery_id === cleanedId) {
+                            duplicate = true;
+                            prevCourier = scanData.courier_name;
+                        }
+                    });
+                }
 
                 if (duplicate) {
                     showMessage('already_scanned', cleanedId, courierName, `Ранее сканировал: ${prevCourier}`);
@@ -918,25 +967,30 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error('Ошибка поиска:', e);
             showMessage('error', 'Ошибка при поиске', '', '', '');
         } finally {
-            loadingIndicator.style.display = 'none';
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
             isProcessing = false;
         }
     }
 
     async function loadStats() {
+        if (!statsList) return;
         statsList.innerHTML = '';
         console.log('Загрузка статистики...');
         try {
             const scansRef = ref(database, 'scans');
             const scansQuery = query(scansRef);
             const scansSnapshot = await get(scansQuery);
-
             if (scansSnapshot.exists()) {
                 scansSnapshot.forEach(scanSnap => {
                     const scanData = scanSnap.val();
-                    console.log('Сканирование:', scanData);
+                    if (!scanData || !scanData.delivery_id || !scanData.courier_name || !scanData.timestamp) return;
                     const li = document.createElement('li');
-                    const date = new Date(scanData.timestamp).toLocaleString('ru-RU');
+                    let date;
+                    try {
+                        date = new Date(scanData.timestamp).toLocaleString('ru-RU');
+                    } catch (e) {
+                        date = 'неизвестно';
+                    }
                     li.textContent = `ID: ${scanData.delivery_id}, Курьер: ${scanData.courier_name}, Время: ${date}`;
                     statsList.appendChild(li);
                 });
@@ -955,13 +1009,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function stopQrScanner() {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            stream = null;
-            videoElement.srcObject = null;
+        try {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                if (videoElement) videoElement.srcObject = null;
+            }
+            if (codeReader) codeReader.reset();
+            if (qrIcon) qrIcon.style.display = 'block';
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+        } catch (e) {
+            console.warn('Ошибка при остановке сканера:', e);
         }
-        if (codeReader) codeReader.reset();
-        qrIcon.style.display = 'block';
-        loadingIndicator.style.display = 'none';
     }
 });

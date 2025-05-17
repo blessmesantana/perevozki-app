@@ -764,6 +764,7 @@ input[type="date"]:focus {
 .archive-modal-content .archive-list-item.scanned {
     opacity: 0.6;
     color: #bfc7e6;
+    text-decoration: line-through;
 }
 .archive-modal-content .archive-list-item.not-scanned {
     opacity: 1;
@@ -835,4 +836,11 @@ input[type="date"]:focus {
 .archive-modal-content .archive-cancel-btn:hover {
     background: #fff;
     color: #3f51b5;
+}
+
+/* Универсальный стиль для перечеркивания и прозрачности отсканированных передач */
+.scanned {
+    text-decoration: line-through;
+    opacity: 0.6;
+    color: #bfc7e6;
 }
