@@ -21,7 +21,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const videoElement = document.getElementById('qr-video');
     const qrIcon = document.querySelector('.qr-icon');
     const loadingIndicator = document.getElementById('loadingIndicator');
-    const cameraSelect = document.getElementById('cameraSelect');
 
     if (qrIcon) qrIcon.style.display = 'block'; // Показываем иконку при загрузке
 
@@ -53,9 +52,6 @@ document.addEventListener("DOMContentLoaded", function () {
     let lastScanTime = 0;
     const scanDelay = 2000;
     let isProcessing = false;
-
-    let availableCameras = [];
-    let selectedDeviceId = localStorage.getItem('selectedCameraId') || null;
 
     // === Защита: Проверка наличия важных DOM-элементов ===
     if (!sidebarMenu) console.warn('sidebarMenu не найден!');
@@ -99,39 +95,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    async function populateCameraSelect() {
-        try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            availableCameras = devices.filter(device => device.kind === 'videoinput');
-            if (!cameraSelect) return;
-            cameraSelect.innerHTML = '';
-            availableCameras.forEach((cam, idx) => {
-                const option = document.createElement('option');
-                option.value = cam.deviceId;
-                option.textContent = cam.label || `Камера ${idx + 1}`;
-                cameraSelect.appendChild(option);
-            });
-            if (selectedDeviceId && availableCameras.some(c => c.deviceId === selectedDeviceId)) {
-                cameraSelect.value = selectedDeviceId;
-            } else if (availableCameras.length > 0) {
-                cameraSelect.value = availableCameras[0].deviceId;
-                selectedDeviceId = availableCameras[0].deviceId;
-            }
-            cameraSelect.style.display = availableCameras.length > 1 ? 'block' : 'none';
-        } catch (e) {
-            console.warn('Ошибка получения списка камер:', e);
-        }
-    }
-
-    if (cameraSelect) {
-        cameraSelect.addEventListener('change', () => {
-            selectedDeviceId = cameraSelect.value;
-            localStorage.setItem('selectedCameraId', selectedDeviceId);
-            // При смене камеры перезапускаем сканер, если он активен
-            if (videoElement && videoElement.srcObject) {
-                stopQrScanner();
-                startQrScanner();
-            }
+    if (scanButton) {
+        scanButton.addEventListener('click', () => {
+            scanButton.classList.add('released');
+            startQrScanner();
+            setTimeout(() => scanButton.classList.remove('released'), 500);
         });
     }
 
@@ -188,14 +156,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (manualTransferIdInput) {
         manualTransferIdInput.addEventListener('keypress', e => {
             if (e.key === 'Enter') manualSubmitButton.click();
-        });
-    }
-
-    if (scanButton) {
-        scanButton.addEventListener('click', () => {
-            scanButton.classList.add('released');
-            populateCameraSelect().then(() => startQrScanner());
-            setTimeout(() => scanButton.classList.remove('released'), 500);
         });
     }
 
@@ -886,19 +846,13 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             if (!qrIcon) throw new Error('qrIcon не найден');
             qrIcon.style.display = 'none'; // Скрываем иконку при открытии камеры
-            await populateCameraSelect();
-            let camera = null;
-            if (selectedDeviceId && availableCameras.some(c => c.deviceId === selectedDeviceId)) {
-                camera = availableCameras.find(c => c.deviceId === selectedDeviceId);
-            } else {
-                camera = availableCameras.find(c => c.label && /back/i.test(c.label)) ||
-                         availableCameras.find(c => c.label && /wide/i.test(c.label)) ||
-                         availableCameras[0] || null;
-                if (camera) {
-                    selectedDeviceId = camera.deviceId;
-                    localStorage.setItem('selectedCameraId', selectedDeviceId);
-                }
-            }
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const cameras = devices.filter(device => device.kind === 'videoinput');
+            // Приоритет: camera2 2, facing back → back → wide → любая
+            let camera = cameras.find(c => c.label && /camera2 2,? facing back/i.test(c.label));
+            if (!camera) camera = cameras.find(c => c.label && /back/i.test(c.label));
+            if (!camera) camera = cameras.find(c => c.label && /wide/i.test(c.label));
+            if (!camera) camera = cameras[0] || null;
             if (!camera) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
                 if (qrIcon) qrIcon.style.display = 'block';
@@ -1074,5 +1028,5 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    window.addEventListener('DOMContentLoaded', populateCameraSelect);
+    window.addEventListener('DOMContentLoaded', () => startQrScanner());
 });
