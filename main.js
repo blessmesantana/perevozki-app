@@ -848,7 +848,10 @@ document.addEventListener("DOMContentLoaded", function () {
             qrIcon.style.display = 'none'; // Скрываем иконку при открытии камеры
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
-            const camera = cameras.find(c => c.label && c.label.toLowerCase().includes('back')) || cameras[0] || null;
+            // Выбираем камеру с приоритетом по названию (ищем back, затем wide, затем первую)
+            let camera = cameras.find(c => c.label && /back/i.test(c.label));
+            if (!camera) camera = cameras.find(c => c.label && /wide/i.test(c.label));
+            if (!camera) camera = cameras[0] || null;
             if (!camera) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
                 if (qrIcon) qrIcon.style.display = 'block';
@@ -856,7 +859,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    facingMode: { exact: "environment" }
+                    deviceId: camera.deviceId ? { exact: camera.deviceId } : undefined,
+                    facingMode: { ideal: "environment" }
                 }
             });
             if (!videoElement) throw new Error('videoElement не найден');
