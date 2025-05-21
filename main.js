@@ -386,7 +386,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 scannedIds.has(d.id) ? 'TRUE' : 'FALSE'
             ]);
             // === URL скрипта Google Apps Script (замените на свой!) ===
-            const scriptUrl = 'https://script.google.com/macros/s/AKfycbyNaLFalnLdDmbmFpJ1wjngzQcyfC7E9YXbytFVd0UCe28uX00HOsHfBfm_59ZOK54T/exec';
+            const scriptUrl = 'https://script.google.com/macros/s/AKfycbxrhmgMaH3BCtorY7fQQve1ovwwsirAs77D9kPiOqkYsgv6xVPrR_czvaeo70AV-wRy/exec';
             // Отправляем POST-запрос
             const response = await fetch(scriptUrl, {
                 method: 'POST',
