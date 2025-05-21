@@ -317,29 +317,6 @@ document.addEventListener("DOMContentLoaded", function () {
     processButton.style.width = '100%';
     sidebarMenuNav.appendChild(processButton);
 
-    // === КНОПКА ЭКСПОРТА ===
-    const exportButton = document.createElement('button');
-    exportButton.id = 'exportButton';
-    exportButton.style.background = 'none';
-    exportButton.style.color = '#fff';
-    exportButton.style.border = 'none';
-    exportButton.style.fontSize = '15px';
-    exportButton.style.fontWeight = '500';
-    exportButton.style.fontFamily = 'Inter, sans-serif';
-    exportButton.style.textAlign = 'center';
-    exportButton.style.borderRadius = '18px';
-    exportButton.style.transition = 'background 0.2s';
-    exportButton.style.letterSpacing = 'normal';
-    exportButton.style.cursor = 'pointer';
-    exportButton.style.padding = '12px 0 10px 0';
-    exportButton.style.width = '100%';
-    exportButton.style.display = 'flex';
-    exportButton.style.alignItems = 'center';
-    exportButton.style.justifyContent = 'center';
-    exportButton.style.marginTop = '360px';
-    exportButton.innerHTML = `<span style="display:flex;align-items:center;width:20px;justify-content:flex-start;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="14" height="12" rx="2" stroke="#fff" stroke-width="1.5"/><rect x="6" y="7" width="2" height="2" rx="0.5" fill="#fff"/><rect x="9" y="7" width="2" height="2" rx="0.5" fill="#fff"/><rect x="12" y="7" width="2" height="2" rx="0.5" fill="#fff"/><rect x="6" y="10" width="2" height="2" rx="0.5" fill="#fff"/><rect x="9" y="10" width="2" height="2" rx="0.5" fill="#fff"/><rect x="12" y="10" width="2" height="2" rx="0.5" fill="#fff"/></svg></span><span style="flex:1;text-align:left;padding-left:12px;">Экспорт</span>`;
-    sidebarMenuNav.appendChild(exportButton);
-
     // === КНОПКА АРХИВ (ВСЕГДА ВНИЗУ) ===
     const archiveButton = document.createElement('button');
     archiveButton.id = 'archiveButton';
@@ -363,48 +340,6 @@ document.addEventListener("DOMContentLoaded", function () {
     archiveButton.style.marginBottom = '8px';
     archiveButton.innerHTML = `<span style="display:flex;align-items:center;width:20px;justify-content:flex-start;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6.5V16a2 2 0 002 2h12a2 2 0 002-2V6.5M2 6.5L4.5 3h11L18 6.5M2 6.5h16" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="flex:1;text-align:left;padding-left:12px;">Архив</span>`;
     sidebarMenuNav.appendChild(archiveButton);
-
-    exportButton.addEventListener('click', async () => {
-        exportButton.disabled = true;
-        exportButton.textContent = 'Экспорт...';
-        try {
-            // Получаем все передачи и сканы
-            const [deliveriesSnap, scansSnap] = await Promise.all([
-                get(ref(database, 'deliveries')),
-                get(ref(database, 'scans'))
-            ]);
-            const deliveries = [];
-            if (deliveriesSnap.exists()) deliveriesSnap.forEach(child => deliveries.push(child.val()));
-            const scans = [];
-            if (scansSnap.exists()) scansSnap.forEach(child => scans.push(child.val()));
-            const scannedIds = new Set(scans.map(s => s.delivery_id));
-            // Формируем массив для экспорта
-            const exportRows = deliveries.map(d => [
-                d.timestamp ? new Date(d.timestamp).toLocaleDateString('ru-RU') : '',
-                d.courier_name || '',
-                d.id || '',
-                scannedIds.has(d.id) ? 'TRUE' : 'FALSE'
-            ]);
-            // === URL скрипта Google Apps Script (замените на свой!) ===
-            const scriptUrl = 'https://script.google.com/macros/s/AKfycbxrhmgMaH3BCtorY7fQQve1ovwwsirAs77D9kPiOqkYsgv6xVPrR_czvaeo70AV-wRy/exec';
-            // Отправляем POST-запрос
-            const response = await fetch(scriptUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rows: exportRows })
-            });
-            if (response.ok) {
-                exportButton.textContent = 'Экспортировано!';
-                setTimeout(() => { exportButton.textContent = 'Экспорт в Google Таблицу'; exportButton.disabled = false; }, 2000);
-            } else {
-                exportButton.textContent = 'Ошибка экспорта';
-                setTimeout(() => { exportButton.textContent = 'Экспорт в Google Таблицу'; exportButton.disabled = false; }, 2000);
-            }
-        } catch (e) {
-            exportButton.textContent = 'Ошибка!';
-            setTimeout(() => { exportButton.textContent = 'Экспорт в Google Таблицу'; exportButton.disabled = false; }, 2000);
-        }
-    });
 
     // === МОДАЛЬНОЕ ОКНО АРХИВА ===
     let archiveModal = null;
@@ -504,6 +439,22 @@ document.addEventListener("DOMContentLoaded", function () {
             dateInput.value = dateList[0];
             modalContent.appendChild(dateInput);
 
+            // === ВЫБОР КУРЬЕРА ===
+            const courierSelect = document.createElement('select');
+            courierSelect.style.width = '100%';
+            courierSelect.style.marginBottom = '18px';
+            courierSelect.style.fontSize = '13px';
+            courierSelect.style.padding = '7px 0 7px 10px';
+            courierSelect.style.borderRadius = '10px';
+            courierSelect.style.border = 'none';
+            courierSelect.style.background = '#3f51b5';
+            courierSelect.style.color = '#fff';
+            courierSelect.style.fontFamily = 'Inter, sans-serif';
+            courierSelect.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+            courierSelect.style.outline = 'none';
+            courierSelect.classList.add('archive-courier-select');
+            modalContent.appendChild(courierSelect);
+
             // Контейнер для данных архива
             const archiveDataDiv = document.createElement('div');
             archiveDataDiv.style.marginTop = '10px';
@@ -511,7 +462,47 @@ document.addEventListener("DOMContentLoaded", function () {
             archiveDataDiv.classList.add('archive-data-div');
             modalContent.appendChild(archiveDataDiv);
 
-            async function loadArchiveForDate(date) {
+            async function loadCouriersForDate(date) {
+                courierSelect.innerHTML = '';
+                archiveDataDiv.innerHTML = '';
+                // Получаем deliveries и scans за выбранную дату
+                const [deliveriesSnap, scansSnap] = await Promise.all([
+                    get(ref(database, `archive/${date}/deliveries`)),
+                    get(ref(database, `archive/${date}/scans`))
+                ]);
+                let deliveries = [];
+                let scans = [];
+                if (deliveriesSnap.exists()) deliveries = deliveriesSnap.val();
+                if (scansSnap.exists()) scans = scansSnap.val();
+                deliveries = Array.isArray(deliveries) ? deliveries : (deliveries ? Object.values(deliveries) : []);
+                scans = Array.isArray(scans) ? scans : (scans ? Object.values(scans) : []);
+                // Собираем список курьеров из deliveries и scans
+                const courierNames = [
+                    ...deliveries.map(d => d.courier_name).filter(Boolean),
+                    ...scans.map(s => s.courier_name).filter(Boolean)
+                ];
+                const couriers = [...new Set(courierNames)];
+                if (couriers.length === 0) {
+                    const empty = document.createElement('option');
+                    empty.value = '';
+                    empty.textContent = 'Нет курьеров';
+                    courierSelect.appendChild(empty);
+                    archiveDataDiv.innerHTML = '<div class="archive-empty">Нет данных за выбранную дату.</div>';
+                    return;
+                }
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Выберите курьера';
+                courierSelect.appendChild(defaultOption);
+                couriers.forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    courierSelect.appendChild(opt);
+                });
+            }
+
+            async function loadArchiveForDateAndCourier(date, courierName) {
                 archiveDataDiv.innerHTML = '';
                 // Получаем данные архива для выбранной даты
                 const deliveriesSnap = await get(ref(database, `archive/${date}/deliveries`));
@@ -520,13 +511,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 let scans = [];
                 if (deliveriesSnap.exists()) deliveries = deliveriesSnap.val();
                 if (scansSnap.exists()) scans = scansSnap.val();
-                // Преобразуем в массивы объектов
                 deliveries = Array.isArray(deliveries) ? deliveries : (deliveries ? Object.values(deliveries) : []);
                 scans = Array.isArray(scans) ? scans : (scans ? Object.values(scans) : []);
-                // Формируем списки
-                const scannedIds = new Set(scans.map(s => s.delivery_id || s.id));
-                const notScanned = deliveries.filter(d => !scannedIds.has(d.id));
-                const scannedList = deliveries.filter(d => scannedIds.has(d.id));
+                // Фильтруем по курьеру
+                const courierDeliveries = deliveries.filter(d => d.courier_name === courierName);
+                const courierScans = scans.filter(s => s.courier_name === courierName);
+                const scannedIds = new Set(courierScans.map(s => s.delivery_id || s.id));
+                const notScanned = courierDeliveries.filter(d => !scannedIds.has(d.id));
+                const scannedList = courierDeliveries.filter(d => scannedIds.has(d.id));
                 // Заголовки и списки
                 const notScannedTitle = document.createElement('div');
                 notScannedTitle.textContent = `Неотсканированные (${notScanned.length}):`;
@@ -534,7 +526,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 archiveDataDiv.appendChild(notScannedTitle);
                 notScanned.forEach(d => {
                     const el = document.createElement('div');
-                    el.textContent = `${d.id} (${d.courier_name})`;
+                    el.textContent = `${d.id}`;
                     el.className = 'archive-list-item not-scanned';
                     archiveDataDiv.appendChild(el);
                 });
@@ -544,21 +536,29 @@ document.addEventListener("DOMContentLoaded", function () {
                 archiveDataDiv.appendChild(scannedTitle);
                 scannedList.forEach(d => {
                     const el = document.createElement('div');
-                    el.textContent = `${d.id} (${d.courier_name})`;
+                    el.textContent = `${d.id}`;
                     el.className = 'archive-list-item scanned';
                     archiveDataDiv.appendChild(el);
                 });
                 if (notScanned.length === 0 && scannedList.length === 0) {
-                    archiveDataDiv.innerHTML = '<div class="archive-empty">Нет данных за выбранную дату.</div>';
+                    archiveDataDiv.innerHTML = '<div class="archive-empty">Нет данных по выбранному курьеру.</div>';
                 }
             }
 
-            // При выборе даты
+            // При выборе даты — обновляем список курьеров
             dateInput.addEventListener('change', e => {
-                loadArchiveForDate(e.target.value);
+                loadCouriersForDate(e.target.value);
             });
-            // По умолчанию — первая дата
-            loadArchiveForDate(dateInput.value);
+            // При выборе курьера — показываем данные
+            courierSelect.addEventListener('change', e => {
+                if (e.target.value) {
+                    loadArchiveForDateAndCourier(dateInput.value, e.target.value);
+                } else {
+                    archiveDataDiv.innerHTML = '';
+                }
+            });
+            // По умолчанию — первая дата и курьеры
+            await loadCouriersForDate(dateInput.value);
         }
 
         // === КНОПКА ПЕРЕНОСА В АРХИВ ===
@@ -961,12 +961,20 @@ document.addEventListener("DOMContentLoaded", function () {
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     deviceId: camera.deviceId ? { exact: camera.deviceId } : undefined,
-                    facingMode: { ideal: "environment" }
+                    facingMode: { ideal: "environment" },
+                    width: { ideal: 480, max: 480 },
+                    height: { ideal: 480, max: 480 },
+                    aspectRatio: 1
                 }
             });
             if (!videoElement) throw new Error('videoElement не найден');
             videoElement.srcObject = stream;
+            videoElement.style.objectFit = 'cover';
+            videoElement.style.width = '100%';
+            videoElement.style.height = '100%';
+            videoElement.style.aspectRatio = '1/1';
             await videoElement.play();
+            if (qrSpinner) qrSpinner.classList.remove('active'); // Скрыть спиннер после запуска камеры
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
@@ -978,7 +986,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
                 if (err && !(err instanceof ZXing.NotFoundException)) {
                     console.error('Ошибка сканирования:', err);
-                    showMessage('error', 'Ошибка сканирования QR', '', '', '');
                 }
             });
         } catch (err) {
@@ -986,6 +993,11 @@ document.addEventListener("DOMContentLoaded", function () {
             showMessage('error', 'Ошибка камеры: ' + (err.message || err), '', '', '');
             showAllQrIcons();
             if (qrSpinner) qrSpinner.classList.remove('active');
+        } finally {
+            // Если камера не запустилась, обязательно скрыть спиннер
+            if (qrSpinner && (!stream || !videoElement || videoElement.paused)) {
+                qrSpinner.classList.remove('active');
+            }
         }
     }
 
