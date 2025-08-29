@@ -91,6 +91,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function syncOverlayStyles() {
         if (inputModeButton && qrResultOverlay) {
+            // overlay теперь абсолютный и занимает всю .button-group, не нужно подгонять размеры
             qrResultOverlay.style.position = 'absolute';
             qrResultOverlay.style.top = '0';
             qrResultOverlay.style.left = '0';
@@ -100,11 +101,14 @@ document.addEventListener("DOMContentLoaded", function () {
             qrResultOverlay.style.padding = '0';
             qrResultOverlay.style.boxSizing = 'border-box';
             qrResultOverlay.style.borderRadius = window.getComputedStyle(inputModeButton).borderRadius;
+            // Можно убрать копирование других стилей, чтобы overlay всегда совпадал с кнопкой
         }
     }
 
+    // Синхронизируем стили overlay при изменении размера окна
     window.addEventListener('resize', syncOverlayStyles);
 
+    // Синхронизируем стили overlay при изменении размеров inputModeButton
     if (window.ResizeObserver && inputModeButton) {
         const ro = new ResizeObserver(syncOverlayStyles);
         ro.observe(inputModeButton);
@@ -121,7 +125,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Показ сообщения
     window.showMessage = function(status, message, courier, previousCourier, rawData) {
         if (!qrResultOverlay) return;
-        syncOverlayStyles();
+        syncOverlayStyles(); // Синхронизировать стили overlay с inputModeButton
         let text = '';
         let colorClass = '';
         if (status === 'already_scanned') {
@@ -143,6 +147,7 @@ document.addEventListener("DOMContentLoaded", function () {
         qrResultOverlay.innerHTML = `<div class='qr-overlay-box'>${text.trim()}</div>`;
         qrResultOverlay.className = `show ${colorClass}`;
         resultDiv.style.display = 'none';
+        // Таймер скрытия для всех уведомлений
         clearTimeout(qrResultOverlay._hideTimer);
         qrResultOverlay._hideTimer = setTimeout(() => {
             qrResultOverlay.className = '';
@@ -150,6 +155,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 2200);
     }
 
+    // Обработчики событий
     if (inputModeButton) {
         inputModeButton.addEventListener('click', () => {
             inputModeButton.classList.add('active');
@@ -176,11 +182,16 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
+    // === Сайдбар: только чекбокс+label, без JS-открытия ===
+    // Удаляем JS-обработчик sidebarToggle, работаем только с чекбоксом
+    // === Закрытие сайдбара по клику вне его ===
     function handleSidebarClose(e) {
         const sidebarMenu = document.getElementById('sidebarMenu');
         const sidebarToggle = document.getElementById('sidebarToggle');
         if (!sidebarMenu || !sidebarToggle) return;
+        // Проверяем открыт ли сайдбар (чекбокс активен)
         const isOpen = sidebarToggle.checked;
+        // Если клик вне меню и вне label (крестика/бургера)
         const label = document.querySelector('label[for="sidebarToggle"]');
         if (
             isOpen &&
@@ -286,6 +297,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (sidebarShowStatsButton) sidebarShowStatsButton.remove();
     if (sidebarStatsList) sidebarStatsList.remove();
 
+    // Переименовываем кнопку и переносим в неё функционал показа передач по курьеру
     const processButton = document.createElement('button');
     processButton.textContent = 'Процесс сканирования';
     processButton.id = 'processScanButton';
@@ -305,6 +317,7 @@ document.addEventListener("DOMContentLoaded", function () {
     processButton.style.width = '100%';
     sidebarMenuNav.appendChild(processButton);
 
+    // === КНОПКА АРХИВ (ВСЕГДА ВНИЗУ) ===
     const archiveButton = document.createElement('button');
     archiveButton.id = 'archiveButton';
     archiveButton.style.background = 'none';
@@ -328,6 +341,7 @@ document.addEventListener("DOMContentLoaded", function () {
     archiveButton.innerHTML = `<span style="display:flex;align-items:center;width:20px;justify-content:flex-start;"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6.5V16a2 2 0 002 2h12a2 2 0 002-2V6.5M2 6.5L4.5 3h11L18 6.5M2 6.5h16" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span style="flex:1;text-align:left;padding-left:12px;">Архив</span>`;
     sidebarMenuNav.appendChild(archiveButton);
 
+    // === МОДАЛЬНОЕ ОКНО АРХИВА ===
     let archiveModal = null;
     let archiveModalContent = null;
     archiveButton.addEventListener('click', async () => {
@@ -357,11 +371,13 @@ document.addEventListener("DOMContentLoaded", function () {
         modalContent.classList.add('archive-modal-content');
         archiveModalContent = modalContent;
         setModalContentWidth(modalContent);
+        // Не закрывать модалку при клике внутри окна
         modalContent.addEventListener('click', e => e.stopPropagation());
 
+        // === Ширина модального окна архива ===
         function setArchiveModalWidth() {
             if (inputModeButton) {
-                const w = Math.min(inputModeButton.offsetWidth, 420);
+                const w = Math.min(inputModeButton.offsetWidth, 420); // ограничим ширину
                 modalContent.style.width = w + 'px';
                 modalContent.style.minWidth = '220px';
                 modalContent.style.maxWidth = '90vw';
@@ -369,12 +385,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 modalContent.style.minWidth = '220px';
                 modalContent.style.maxWidth = '90vw';
             }
-            modalContent.style.maxHeight = '80vh';
+            modalContent.style.maxHeight = '80vh'; // ограничим высоту
             modalContent.style.overflowY = 'auto';
         }
         setArchiveModalWidth();
         window.addEventListener('resize', setArchiveModalWidth);
 
+        // Заголовок
         const title = document.createElement('div');
         title.textContent = 'Архив передач по дате';
         title.style.fontSize = '13px';
@@ -383,21 +400,24 @@ document.addEventListener("DOMContentLoaded", function () {
         title.style.fontFamily = 'Inter, sans-serif';
         modalContent.appendChild(title);
 
+        // === ВЫБОР ДАТЫ ===
+        // Получаем список дат из архива (пусть структура: archive/YYYY-MM-DD/deliveries, archive/YYYY-MM-DD/scans)
         const archiveRef = ref(database, 'archive');
         const archiveSnap = await get(archiveRef);
         let dateList = [];
         if (archiveSnap.exists()) {
             archiveSnap.forEach(child => {
-                dateList.push(child.key);
+                dateList.push(child.key); // YYYY-MM-DD
             });
         }
-        dateList = dateList.sort((a, b) => b.localeCompare(a));
+        dateList = dateList.sort((a, b) => b.localeCompare(a)); // новые сверху
         if (dateList.length === 0) {
             const empty = document.createElement('div');
             empty.textContent = 'Архив пуст.';
             empty.style.margin = '20px 0';
             modalContent.appendChild(empty);
         } else {
+            // === КАЛЕНДАРЬ ===
             const dateInput = document.createElement('input');
             dateInput.type = 'date';
             dateInput.style.width = '100%';
@@ -413,11 +433,13 @@ document.addEventListener("DOMContentLoaded", function () {
             dateInput.style.outline = 'none';
             dateInput.style.textAlign = 'left';
             dateInput.classList.add('archive-date-input');
+            // Ограничим выбор только существующими датами
             dateInput.min = dateList[dateList.length-1];
             dateInput.max = dateList[0];
             dateInput.value = dateList[0];
             modalContent.appendChild(dateInput);
 
+            // === ВЫБОР КУРЬЕРА ===
             const courierSelect = document.createElement('select');
             courierSelect.style.width = '100%';
             courierSelect.style.marginBottom = '18px';
@@ -433,6 +455,7 @@ document.addEventListener("DOMContentLoaded", function () {
             courierSelect.classList.add('archive-courier-select');
             modalContent.appendChild(courierSelect);
 
+            // Контейнер для данных архива
             const archiveDataDiv = document.createElement('div');
             archiveDataDiv.style.marginTop = '10px';
             archiveDataDiv.style.textAlign = 'left';
@@ -442,6 +465,7 @@ document.addEventListener("DOMContentLoaded", function () {
             async function loadCouriersForDate(date) {
                 courierSelect.innerHTML = '';
                 archiveDataDiv.innerHTML = '';
+                // Получаем deliveries и scans за выбранную дату
                 const [deliveriesSnap, scansSnap] = await Promise.all([
                     get(ref(database, `archive/${date}/deliveries`)),
                     get(ref(database, `archive/${date}/scans`))
@@ -452,6 +476,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (scansSnap.exists()) scans = scansSnap.val();
                 deliveries = Array.isArray(deliveries) ? deliveries : (deliveries ? Object.values(deliveries) : []);
                 scans = Array.isArray(scans) ? scans : (scans ? Object.values(scans) : []);
+                // Собираем список курьеров из deliveries и scans
                 const courierNames = [
                     ...deliveries.map(d => d.courier_name).filter(Boolean),
                     ...scans.map(s => s.courier_name).filter(Boolean)
@@ -479,6 +504,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             async function loadArchiveForDateAndCourier(date, courierName) {
                 archiveDataDiv.innerHTML = '';
+                // Получаем данные архива для выбранной даты
                 const deliveriesSnap = await get(ref(database, `archive/${date}/deliveries`));
                 const scansSnap = await get(ref(database, `archive/${date}/scans`));
                 let deliveries = [];
@@ -487,11 +513,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (scansSnap.exists()) scans = scansSnap.val();
                 deliveries = Array.isArray(deliveries) ? deliveries : (deliveries ? Object.values(deliveries) : []);
                 scans = Array.isArray(scans) ? scans : (scans ? Object.values(scans) : []);
+                // Фильтруем по курьеру
                 const courierDeliveries = deliveries.filter(d => d.courier_name === courierName);
                 const courierScans = scans.filter(s => s.courier_name === courierName);
                 const scannedIds = new Set(courierScans.map(s => s.delivery_id || s.id));
                 const notScanned = courierDeliveries.filter(d => !scannedIds.has(d.id));
                 const scannedList = courierDeliveries.filter(d => scannedIds.has(d.id));
+                // Заголовки и списки
                 const notScannedTitle = document.createElement('div');
                 notScannedTitle.textContent = `Неотсканированные (${notScanned.length}):`;
                 notScannedTitle.className = 'archive-section-title';
@@ -517,9 +545,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
 
+            // При выборе даты — обновляем список курьеров
             dateInput.addEventListener('change', e => {
                 loadCouriersForDate(e.target.value);
             });
+            // При выборе курьера — показываем данные
             courierSelect.addEventListener('change', e => {
                 if (e.target.value) {
                     loadArchiveForDateAndCourier(dateInput.value, e.target.value);
@@ -527,9 +557,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     archiveDataDiv.innerHTML = '';
                 }
             });
+            // По умолчанию — первая дата и курьеры
             await loadCouriersForDate(dateInput.value);
         }
 
+        // === КНОПКА ПЕРЕНОСА В АРХИВ ===
         const moveToArchiveBtn = document.createElement('button');
         moveToArchiveBtn.textContent = 'Перенести в архив';
         moveToArchiveBtn.style.background = '#ea1e63';
@@ -547,6 +579,7 @@ document.addEventListener("DOMContentLoaded", function () {
         modalContent.appendChild(moveToArchiveBtn);
 
         moveToArchiveBtn.addEventListener('click', async () => {
+            // Окно подтверждения
             const confirmModal = document.createElement('div');
             confirmModal.style.position = 'fixed';
             confirmModal.style.top = '0';
@@ -570,6 +603,7 @@ document.addEventListener("DOMContentLoaded", function () {
             confirmBox.style.fontFamily = 'Inter, sans-serif';
             confirmBox.style.fontSize = '15px';
             confirmBox.classList.add('archive-confirm-box');
+            // === Ширина окна подтверждения ===
             function setConfirmBoxWidth() {
                 if (inputModeButton) {
                     const w = inputModeButton.offsetWidth;
@@ -620,6 +654,7 @@ document.addEventListener("DOMContentLoaded", function () {
             yesBtn.addEventListener('click', async () => {
                 yesBtn.disabled = true;
                 yesBtn.textContent = 'Перенос...';
+                // Получаем все deliveries и scans
                 try {
                     const [delSnap, scanSnap] = await Promise.all([
                         get(ref(database, 'deliveries')),
@@ -629,11 +664,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (delSnap.exists()) delSnap.forEach(child => deliveries.push(child.val()));
                     const scans = [];
                     if (scanSnap.exists()) scanSnap.forEach(child => scans.push(child.val()));
+                    // Дата для архива
                     const now = new Date();
                     const pad = n => n.toString().padStart(2, '0');
                     const dateStr = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+                    // Записываем в archive
                     await set(ref(database, `archive/${dateStr}/deliveries`), deliveries);
                     await set(ref(database, `archive/${dateStr}/scans`), scans);
+                    // Очищаем deliveries и scans
                     await set(ref(database, 'deliveries'), null);
                     await set(ref(database, 'scans'), null);
                     yesBtn.textContent = 'Готово!';
@@ -654,6 +692,7 @@ document.addEventListener("DOMContentLoaded", function () {
         document.body.appendChild(archiveModal);
     });
 
+    // Модальное окно для вывода статистики по курьеру (оставляем как было)
     let courierStatsModal = null;
     let courierStatsModalContent = null;
     function showCourierStatsModal(courierName) {
@@ -694,6 +733,7 @@ document.addEventListener("DOMContentLoaded", function () {
         title.style.fontFamily = 'Inter, sans-serif';
         modalContent.appendChild(title);
 
+        // Добавим кнопку закрытия для удобства
         const closeBtn = document.createElement('button');
         closeBtn.textContent = '×';
         closeBtn.style.position = 'absolute';
@@ -708,6 +748,7 @@ document.addEventListener("DOMContentLoaded", function () {
         closeBtn.addEventListener('click', () => courierStatsModal.remove());
         modalContent.appendChild(closeBtn);
 
+        // Получаем все передачи и сканы для этого курьера
         Promise.all([
             get(query(ref(database, 'deliveries'))),
             get(query(ref(database, 'scans')))
@@ -726,6 +767,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (s.courier_name === courierName) scanned.add(s.delivery_id);
                 });
             }
+            // Неотсканированные сверху, отсканированные снизу (opacity 0.6)
             const notScanned = allDeliveries.filter(id => !scanned.has(id));
             const scannedList = allDeliveries.filter(id => scanned.has(id));
             const list = document.createElement('div');
@@ -746,7 +788,7 @@ document.addEventListener("DOMContentLoaded", function () {
             scannedList.forEach(id => {
                 const el = document.createElement('div');
                 el.textContent = id;
-                el.classList.add('scanned');
+                el.classList.add('scanned'); // Класс для перечеркивания и прозрачности
                 el.style.opacity = '0.6';
                 el.style.fontSize = '13px';
                 el.style.transition = 'opacity 0.3s';
@@ -761,6 +803,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     processButton.addEventListener('click', async () => {
+        // Получаем список всех курьеров
         const couriersSnap = await get(query(ref(database, 'couriers')));
         let couriers = [];
         if (couriersSnap.exists()) {
@@ -770,6 +813,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         }
         couriers = [...new Set(couriers)];
+        // Показываем выбор курьера
         const selectModal = document.createElement('div');
         selectModal.style.position = 'fixed';
         selectModal.style.top = '0';
@@ -828,25 +872,31 @@ document.addEventListener("DOMContentLoaded", function () {
         document.body.appendChild(selectModal);
     });
 
+    // === ОБНОВЛЕНИЕ ШИРИНЫ И СТИЛЕЙ МОДАЛОК И ВСПЛЫВАЮЩИХ ОКОН ПРИ РЕСАЙЗЕ ===
     function updateAllModalWidths() {
         setModalContentWidth(archiveModalContent);
         setModalContentWidth(courierStatsModalContent);
+        // Для selectModal ищем по классу, т.к. он создается динамически
         const selectModalContent = document.querySelector('.select-modal-content');
         if (selectModalContent) setModalContentWidth(selectModalContent);
+        // Для всплывающего окна результата
         syncOverlayStyles();
     }
     window.addEventListener('resize', updateAllModalWidths);
     updateAllModalWidths();
 
+    // Функции
     function parseRawData(text) {
         if (!text || typeof text !== 'string') return { courierName: '', deliveryIds: [] };
         const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
         if (lines.length === 0) return { courierName: '', deliveryIds: [] };
 
+        // Фамилия — только первое слово первой строки, только буквы (рус/лат)
         const firstLine = lines[0];
         const courierNameMatch = firstLine.match(/^([А-Яа-яA-Za-z]+)/);
         const courierName = courierNameMatch ? courierNameMatch[1] : '';
 
+        // Все 10-значные числа из всех строк
         const deliveryIds = lines
             .map(line => line.match(/\b\d{10}\b/g))
             .filter(Boolean)
@@ -894,96 +944,29 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             if (!qrIcons.length) throw new Error('qrIcons не найдены');
             if (qrSpinner) qrSpinner.classList.add('active');
-            hideAllQrIcons();
-
+            hideAllQrIcons(); // Скрыть все svg-иконки при запуске сканера
             const devices = await navigator.mediaDevices.enumerateDevices();
             const cameras = devices.filter(device => device.kind === 'videoinput');
-
-            // Логирование для диагностики
-            console.log('Доступные камеры:', cameras.map(c => ({
-                label: c.label,
-                deviceId: c.deviceId
-            })));
-
-            // Функция для получения разрешения камеры
-            async function getCameraResolution(deviceId) {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        video: { deviceId: { exact: deviceId } }
-                    });
-                    const track = stream.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
-                    track.stop();
-                    stream.getTracks().forEach(t => t.stop());
-                    return {
-                        deviceId,
-                        width: capabilities.width.max || 0,
-                        height: capabilities.height.max || 0,
-                        resolution: (capabilities.width.max || 0) * (capabilities.height.max || 0)
-                    };
-                } catch (e) {
-                    console.warn(`Не удалось получить разрешение для камеры ${deviceId}:`, e);
-                    return { deviceId, width: 0, height: 0, resolution: 0 };
-                }
-            }
-
-            // Получаем разрешения для всех камер
-            const cameraResolutions = await Promise.all(
-                cameras.map(async camera => {
-                    const res = await getCameraResolution(camera.deviceId);
-                    return {
-                        ...res,
-                        label: camera.label
-                    };
-                })
-            );
-
-            // Логируем разрешения
-            console.log('Разрешения камер:', cameraResolutions);
-
-            // Приоритет выбора камеры:
-            // 1. Метка содержит "camera2 2, facing back" и высокое разрешение
-            // 2. Метка содержит "back" или "rear", без "wide", и высокое разрешение
-            // 3. Любая камера с наивысшим разрешением, без "wide"
-            // 4. Первая доступная камера
-            let camera = null;
-            let maxResolution = 0;
-
-            camera = cameraResolutions.find(c => c.label && /camera2 2,? facing back/i.test(c.label) && c.resolution > 0);
+            // Приоритет: camera2 2, facing back → back → wide → любая
+            let camera = cameras.find(c => c.label && /camera2 2,? facing back/i.test(c.label));
+            if (!camera) camera = cameras.find(c => c.label && /back/i.test(c.label));
+            if (!camera) camera = cameras.find(c => c.label && /wide/i.test(c.label));
+            if (!camera) camera = cameras[0] || null;
             if (!camera) {
-                camera = cameraResolutions.find(c => c.label && /(back|rear)/i.test(c.label) && !/wide/i.test(c.label) && c.resolution > 0);
-            }
-            if (!camera) {
-                camera = cameraResolutions
-                    .filter(c => c.label && !/wide/i.test(c.label) && c.resolution > 0)
-                    .sort((a, b) => b.resolution - a.resolution)[0];
-            }
-            if (!camera) {
-                camera = cameraResolutions[0] || null;
-            }
-
-            if (!camera || !camera.deviceId) {
                 showMessage('error', 'Камеры не найдены на устройстве', '', '', '');
                 showAllQrIcons();
                 if (qrSpinner) qrSpinner.classList.remove('active');
                 return;
             }
-
-            console.log('Выбрана камера:', {
-                label: camera.label,
-                deviceId: camera.deviceId,
-                resolution: `${camera.width}x${camera.height}`
-            });
-
             stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    deviceId: { exact: camera.deviceId },
+                    deviceId: camera.deviceId ? { exact: camera.deviceId } : undefined,
+                    facingMode: { ideal: "environment" },
                     width: { ideal: 480, max: 480 },
                     height: { ideal: 480, max: 480 },
                     aspectRatio: 1
                 }
             });
-
             if (!videoElement) throw new Error('videoElement не найден');
             videoElement.srcObject = stream;
             videoElement.style.objectFit = 'cover';
@@ -991,8 +974,7 @@ document.addEventListener("DOMContentLoaded", function () {
             videoElement.style.height = '100%';
             videoElement.style.aspectRatio = '1/1';
             await videoElement.play();
-            if (qrSpinner) qrSpinner.classList.remove('active');
-
+            if (qrSpinner) qrSpinner.classList.remove('active'); // Скрыть спиннер после запуска камеры
             if (!codeReader) {
                 codeReader = new ZXing.BrowserMultiFormatReader();
             }
@@ -1012,6 +994,7 @@ document.addEventListener("DOMContentLoaded", function () {
             showAllQrIcons();
             if (qrSpinner) qrSpinner.classList.remove('active');
         } finally {
+            // Если камера не запустилась, обязательно скрыть спиннер
             if (qrSpinner && (!stream || !videoElement || videoElement.paused)) {
                 qrSpinner.classList.remove('active');
             }
@@ -1026,9 +1009,10 @@ document.addEventListener("DOMContentLoaded", function () {
         navigator.vibrate?.(200);
         flashFrame();
         processTransferId(decodedText).finally(() => {
+            // После завершения обработки — снова открыть камеру через 1 секунду
             setTimeout(() => {
                 startQrScanner();
-            }, 1000);
+            }, 1000); // Задержка 1 секунда, чтобы пользователь успел убрать QR
         });
     }
 
@@ -1044,6 +1028,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (qrSpinner) qrSpinner.classList.add('active');
         hideAllQrIcons();
         try {
+            // Из QR берем либо 10-значное число, либо 4-значное
             let cleanedId = '';
             let isShort = false;
             const match10 = transferId.match(/\b\d{10}\b/);
@@ -1091,12 +1076,14 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (matchedDeliveries.length === 1) {
+                // Обычная логика для одной передачи
                 const data = matchedDeliveries[0];
                 await processDeliveryScan(data);
                 isProcessing = false;
                 return;
             }
 
+            // Если найдено несколько — показать выбор
             showTransferSelectModal(matchedDeliveries, async (selectedDelivery) => {
                 await processDeliveryScan(selectedDelivery);
                 isProcessing = false;
@@ -1113,9 +1100,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    // Обработка выбранной передачи (или единственной)
     async function processDeliveryScan(data) {
         const cleanedId = data.id;
         const courierName = data.courier_name;
+        // Проверяем на дубликат
         const scansRef = ref(database, 'scans');
         const scansQuery = query(scansRef);
         const scansSnapshot = await get(scansQuery);
@@ -1143,9 +1132,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    // Модалка выбора передачи по 4 цифрам
     function showTransferSelectModal(deliveries, onSelect) {
+        // Удалить старую модалку если есть
         let selectModal = document.getElementById('transferSelectModal');
-        if (selectModal) selectModal.remove();
+        if (selectModal) selectModal.remove(); // <-- Исправлено: удаляем старую модалку
         selectModal = document.createElement('div');
         selectModal.id = 'transferSelectModal';
         selectModal.style.position = 'fixed';
