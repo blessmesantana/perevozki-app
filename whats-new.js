@@ -6,7 +6,7 @@ const NEW_BADGE_VERSIONS = new Map([
 
 const WHATS_NEW_SECTIONS = [
     {
-        version: 'v1.9.6',
+        version: 'v1.9.6 beta',
         items: [
             {
                 title: 'Сканер работает стабильнее',
