@@ -1,12 +1,28 @@
 import { database } from './firebase.js';
 import {
+    normalizeDeliveryId,
+    parseTransferId,
+} from './deliveries.js';
+import { captureException } from './logger.js';
+import {
     get,
+    onValue,
     push,
     query,
     ref,
     set,
     update,
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js';
+
+const collectionCache = new Map();
+const collectionVersions = new Map();
+const collectionIndexes = new Map();
+const EMPTY_COLLECTION = Object.freeze([]);
+const DELIVERY_SHORT_ID_LENGTH = 4;
+
+function normalizeCourierName(value) {
+    return String(value || '').trim().toLocaleLowerCase('ru-RU');
+}
 
 function snapshotToArray(snapshot) {
     const items = [];
@@ -27,10 +43,185 @@ function snapshotToArray(snapshot) {
     return items;
 }
 
-async function getCollection(path) {
-    const snapshot = await get(query(ref(database, path)));
+function freezeRecord(record) {
+    return Object.freeze({ ...record });
+}
 
-    return snapshotToArray(snapshot);
+function freezeCollection(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return EMPTY_COLLECTION;
+    }
+
+    return Object.freeze(items.map((item) => freezeRecord(item)));
+}
+
+function freezeBuckets(sourceMap) {
+    const frozenMap = new Map();
+
+    sourceMap.forEach((bucket, key) => {
+        frozenMap.set(key, Object.freeze([...bucket]));
+    });
+
+    return frozenMap;
+}
+
+function buildCollectionIndexes(path, items, version) {
+    if (path === 'deliveries') {
+        const byNormalizedId = new Map();
+        const byShortId = new Map();
+
+        items.forEach((delivery) => {
+            const normalizedId = normalizeDeliveryId(delivery?.id);
+
+            if (!normalizedId) {
+                return;
+            }
+
+            const exactBucket = byNormalizedId.get(normalizedId) || [];
+            exactBucket.push(delivery);
+            byNormalizedId.set(normalizedId, exactBucket);
+
+            const shortId = normalizedId.slice(-DELIVERY_SHORT_ID_LENGTH);
+            const shortBucket = byShortId.get(shortId) || [];
+            shortBucket.push(delivery);
+            byShortId.set(shortId, shortBucket);
+        });
+
+        return {
+            byNormalizedId: freezeBuckets(byNormalizedId),
+            byShortId: freezeBuckets(byShortId),
+            version,
+        };
+    }
+
+    if (path === 'scans') {
+        const byDeliveryId = new Map();
+
+        items.forEach((scan) => {
+            const normalizedId = normalizeDeliveryId(scan?.delivery_id);
+
+            if (!normalizedId || byDeliveryId.has(normalizedId)) {
+                return;
+            }
+
+            byDeliveryId.set(normalizedId, scan);
+        });
+
+        return {
+            byDeliveryId,
+            version,
+        };
+    }
+
+    return {
+        version,
+    };
+}
+
+function setCollectionData(path, items, version) {
+    const frozenItems = freezeCollection(items);
+
+    collectionVersions.set(path, version);
+    collectionCache.set(path, {
+        data: frozenItems,
+        version,
+    });
+    collectionIndexes.set(path, buildCollectionIndexes(path, frozenItems, version));
+
+    return frozenItems;
+}
+
+function uniquePaths(paths) {
+    return [...new Set(paths.filter(Boolean))];
+}
+
+function getCollectionVersion(path) {
+    return collectionVersions.get(path) || 0;
+}
+
+function prefetchCollections(paths) {
+    uniquePaths(paths).forEach((path) => {
+        void getCollection(path).catch(() => {
+            collectionCache.delete(path);
+            collectionIndexes.delete(path);
+        });
+    });
+}
+
+function invalidateCollections(paths, options = {}) {
+    const normalizedPaths = uniquePaths(paths);
+
+    normalizedPaths.forEach((path) => {
+        collectionVersions.set(path, getCollectionVersion(path) + 1);
+        collectionCache.delete(path);
+        collectionIndexes.delete(path);
+    });
+
+    if (options.prefetch) {
+        prefetchCollections(normalizedPaths);
+    }
+}
+
+function appendCollectionItems(path, items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return;
+    }
+
+    const cachedItems = collectionCache.get(path)?.data || EMPTY_COLLECTION;
+    const nextVersion = getCollectionVersion(path) + 1;
+
+    setCollectionData(path, [...cachedItems, ...items], nextVersion);
+}
+
+async function getCollection(path) {
+    const cachedEntry = collectionCache.get(path);
+    const currentVersion = getCollectionVersion(path);
+
+    if (cachedEntry?.data && cachedEntry.version === currentVersion) {
+        return cachedEntry.data;
+    }
+
+    if (cachedEntry?.promise && cachedEntry.version === currentVersion) {
+        return cachedEntry.promise;
+    }
+
+    const requestVersion = currentVersion;
+    const loadPromise = (async () => {
+        const snapshot = await get(query(ref(database, path)));
+        const items = snapshotToArray(snapshot);
+
+        if (getCollectionVersion(path) === requestVersion) {
+            return setCollectionData(path, items, requestVersion);
+        }
+
+        return freezeCollection(items);
+    })();
+
+    collectionCache.set(path, { promise: loadPromise, version: requestVersion });
+
+    try {
+        return await loadPromise;
+    } catch (error) {
+        collectionCache.delete(path);
+        collectionIndexes.delete(path);
+        throw error;
+    }
+}
+
+async function getCollectionIndex(path) {
+    const currentVersion = getCollectionVersion(path);
+    const cachedIndex = collectionIndexes.get(path);
+
+    if (cachedIndex?.version === currentVersion) {
+        return cachedIndex;
+    }
+
+    await getCollection(path);
+
+    return (
+        collectionIndexes.get(path)
+        || buildCollectionIndexes(path, EMPTY_COLLECTION, getCollectionVersion(path))
+    );
 }
 
 async function removePaths(paths) {
@@ -59,19 +250,119 @@ export async function getScans() {
     return getCollection('scans');
 }
 
+export async function getTelemetryEvents() {
+    const items = await getCollection('telemetry_events');
+    return [...items].sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
+}
+
+export async function findMatchingDeliveriesByTransferId(rawTransferId) {
+    const parsedTransferId = parseTransferId(rawTransferId);
+
+    if (!parsedTransferId.cleanedId) {
+        return {
+            ...parsedTransferId,
+            matches: EMPTY_COLLECTION,
+        };
+    }
+
+    const deliveryIndex = await getCollectionIndex('deliveries');
+    const matches = parsedTransferId.isShort
+        ? deliveryIndex.byShortId?.get(parsedTransferId.cleanedId) || EMPTY_COLLECTION
+        : deliveryIndex.byNormalizedId?.get(parsedTransferId.cleanedId) || EMPTY_COLLECTION;
+
+    return {
+        ...parsedTransferId,
+        matches,
+    };
+}
+
+export async function findScanByDeliveryId(deliveryId) {
+    const normalizedId = normalizeDeliveryId(deliveryId);
+
+    if (!normalizedId) {
+        return null;
+    }
+
+    const scanIndex = await getCollectionIndex('scans');
+    return scanIndex.byDeliveryId?.get(normalizedId) || null;
+}
+
+function subscribeCollection(path, onData, onError = null) {
+    const collectionRef = ref(database, path);
+
+    return onValue(
+        collectionRef,
+        (snapshot) => {
+            const items = snapshotToArray(snapshot);
+            const nextVersion = getCollectionVersion(path) + 1;
+            const frozenItems = setCollectionData(path, items, nextVersion);
+
+            onData(frozenItems);
+        },
+        (error) => {
+            captureException(error, {
+                operation: 'subscribe_collection',
+                path,
+                tags: {
+                    scope: 'firebase',
+                },
+            });
+            if (typeof onError === 'function') {
+                onError(error);
+            } else {
+                console.error(`Subscription error for "${path}":`, error);
+            }
+        },
+    );
+}
+
+export function subscribeCouriers(onData, onError = null) {
+    return subscribeCollection('couriers', onData, onError);
+}
+
+export function subscribeDeliveries(onData, onError = null) {
+    return subscribeCollection('deliveries', onData, onError);
+}
+
+export function subscribeScans(onData, onError = null) {
+    return subscribeCollection('scans', onData, onError);
+}
+
+export function subscribeTelemetryEvents(onData, onError = null) {
+    return subscribeCollection(
+        'telemetry_events',
+        (items) => {
+            onData(
+                [...items].sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0)),
+            );
+        },
+        onError,
+    );
+}
+
+export async function warmAdminData() {
+    await Promise.all([
+        getCollection('couriers'),
+        getCollection('deliveries'),
+        getCollection('scans'),
+    ]);
+}
+
 export async function saveCourier(courierName) {
     const courierRef = push(ref(database, 'couriers'));
     const record = {
         name: courierName,
         timestamp: Date.now(),
     };
-
-    await set(courierRef, record);
-
-    return {
+    const savedCourier = {
         key: courierRef.key,
         ...record,
     };
+
+    await set(courierRef, record);
+    appendCollectionItems('couriers', [savedCourier]);
+
+    return savedCourier;
 }
 
 export async function saveDeliveries(courierId, courierName, deliveryIds) {
@@ -89,13 +380,16 @@ export async function saveDeliveries(courierId, courierName, deliveryIds) {
             courier_name: courierName,
             timestamp: Date.now(),
         };
-
-        await set(deliveryRef, record);
-        savedDeliveries.push({
+        const savedDelivery = {
             key: deliveryRef.key,
             ...record,
-        });
+        };
+
+        await set(deliveryRef, record);
+        savedDeliveries.push(savedDelivery);
     }
+
+    appendCollectionItems('deliveries', savedDeliveries);
 
     return savedDeliveries;
 }
@@ -107,13 +401,15 @@ export async function saveScan(deliveryId, courierName, timestamp = Date.now()) 
         courier_name: courierName,
         timestamp,
     };
-
-    await set(scanRef, record);
-
-    return {
+    const savedScan = {
         key: scanRef.key,
         ...record,
     };
+
+    await set(scanRef, record);
+    appendCollectionItems('scans', [savedScan]);
+
+    return savedScan;
 }
 
 export async function deleteAllDailyData() {
@@ -122,6 +418,9 @@ export async function deleteAllDailyData() {
         deliveries: null,
         scans: null,
     });
+    invalidateCollections(['couriers', 'deliveries', 'scans'], {
+        prefetch: true,
+    });
 }
 
 export async function deleteAllDeliveriesAndScans() {
@@ -129,52 +428,96 @@ export async function deleteAllDeliveriesAndScans() {
         deliveries: null,
         scans: null,
     });
+    invalidateCollections(['deliveries', 'scans'], { prefetch: true });
 }
 
 export async function deleteCourierByName(courierName) {
+    const normalizedCourierName = normalizeCourierName(courierName);
     const couriers = await getCouriers();
     const keysToDelete = couriers
-        .filter((courier) => courier.name === courierName)
+        .filter((courier) => normalizeCourierName(courier.name) === normalizedCourierName)
         .map((courier) => `couriers/${courier.key}`);
 
     await removePaths(keysToDelete);
+    invalidateCollections(['couriers'], { prefetch: true });
 
     return keysToDelete;
 }
 
 export async function deleteDeliveriesByCourier(courierName) {
+    const normalizedCourierName = normalizeCourierName(courierName);
     const deliveries = await getDeliveries();
     const matchedDeliveries = deliveries.filter(
-        (delivery) => delivery.courier_name === courierName,
+        (delivery) => normalizeCourierName(delivery.courier_name) === normalizedCourierName,
     );
 
     await removePaths(
         matchedDeliveries.map((delivery) => `deliveries/${delivery.key}`),
     );
+    invalidateCollections(['deliveries'], { prefetch: true });
 
     return matchedDeliveries;
 }
 
 export async function deleteScansByCourier(courierName) {
+    const normalizedCourierName = normalizeCourierName(courierName);
     const scans = await getScans();
-    const matchedScans = scans.filter((scan) => scan.courier_name === courierName);
+    const matchedScans = scans.filter(
+        (scan) => normalizeCourierName(scan.courier_name) === normalizedCourierName,
+    );
 
     await removePaths(matchedScans.map((scan) => `scans/${scan.key}`));
+    invalidateCollections(['scans'], { prefetch: true });
 
     return matchedScans;
 }
 
 export async function deleteScansByDeliveryIds(deliveryIds) {
-    const ids = new Set(deliveryIds.filter(Boolean));
+    const ids = new Set(deliveryIds.map((deliveryId) => normalizeDeliveryId(deliveryId)).filter(Boolean));
 
     if (ids.size === 0) {
         return [];
     }
 
     const scans = await getScans();
-    const matchedScans = scans.filter((scan) => ids.has(scan.delivery_id));
+    const matchedScans = scans.filter((scan) => ids.has(normalizeDeliveryId(scan.delivery_id)));
 
     await removePaths(matchedScans.map((scan) => `scans/${scan.key}`));
+    invalidateCollections(['scans'], { prefetch: true });
+
+    return matchedScans;
+}
+
+export async function deleteDeliveryByCourierAndId(courierName, deliveryId) {
+    const normalizedCourierName = normalizeCourierName(courierName);
+    const normalizedDeliveryId = normalizeDeliveryId(deliveryId);
+    const deliveries = await getDeliveries();
+    const matchedDeliveries = deliveries.filter(
+        (delivery) =>
+            normalizeCourierName(delivery.courier_name) === normalizedCourierName &&
+            normalizeDeliveryId(delivery.id) === normalizedDeliveryId,
+    );
+
+    await removePaths(
+        matchedDeliveries.map((delivery) => `deliveries/${delivery.key}`),
+    );
+    invalidateCollections(['deliveries'], { prefetch: true });
+
+    return matchedDeliveries;
+}
+
+export async function deleteScansByCourierAndDeliveryId(courierName, deliveryId) {
+    const normalizedCourierName = normalizeCourierName(courierName);
+    const normalizedDeliveryId = normalizeDeliveryId(deliveryId);
+    const scans = await getScans();
+    const matchedScans = scans.filter(
+        (scan) =>
+            normalizeCourierName(scan.courier_name) === normalizedCourierName &&
+            normalizeDeliveryId(scan.delivery_id) === normalizedDeliveryId,
+    );
+
+    await removePaths(matchedScans.map((scan) => `scans/${scan.key}`));
+    invalidateCollections(['scans'], { prefetch: true });
 
     return matchedScans;
 }
@@ -202,5 +545,15 @@ export async function deleteDeliveriesAndRelatedScansByCourier(courierName) {
 
     return {
         deletedDeliveryIds,
+    };
+}
+
+export async function deleteDeliveryAndRelatedScansByCourier(courierName, deliveryId) {
+    const deletedDeliveries = await deleteDeliveryByCourierAndId(courierName, deliveryId);
+
+    await deleteScansByCourierAndDeliveryId(courierName, deliveryId);
+
+    return {
+        deletedDeliveryIds: deletedDeliveries.map((delivery) => delivery.id),
     };
 }

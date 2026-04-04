@@ -1,17 +1,36 @@
-import { findMatchingDeliveries } from './deliveries.js';
+import {
+    captureException,
+    trackEvent,
+} from './logger.js';
 
 export function createScannerController({
     state,
     service,
     ui,
     camera,
-    scanDelay = 2000,
 }) {
+    const SCAN_VIBRATION_MS = 100;
+    const SCAN_VIBRATION_THROTTLE_MS = 1500;
+
+    function triggerScanFeedback(status) {
+        if (!['success', 'already_scanned', 'not_found'].includes(status)) {
+            return;
+        }
+
+        const now = Date.now();
+
+        if (now - (state.lastScanFeedbackAt || 0) < SCAN_VIBRATION_THROTTLE_MS) {
+            ui.flashFrame();
+            return;
+        }
+
+        state.lastScanFeedbackAt = now;
+        navigator.vibrate?.(SCAN_VIBRATION_MS);
+        ui.flashFrame();
+    }
+
     async function processDeliveryScan(delivery) {
-        const scans = await service.getScans();
-        const duplicateScan = scans.find(
-            (scan) => scan.delivery_id === delivery.id,
-        );
+        const duplicateScan = await service.findScanByDeliveryId(delivery.id);
 
         if (duplicateScan) {
             ui.showScanResult(
@@ -44,11 +63,20 @@ export function createScannerController({
         ui.setLoading(true);
 
         try {
-            const deliveries = await service.getDeliveries();
-            const matchedResult = findMatchingDeliveries(transferId, deliveries);
+            const matchedResult = await service.findMatchingDeliveriesByTransferId(
+                transferId,
+            );
 
             if (!matchedResult.cleanedId) {
                 ui.showScanResult('error', 'Неверный формат QR', '', '', '');
+                trackEvent(
+                    'manual_submit_invalid',
+                    {
+                        inputLength: String(transferId || '').length,
+                        source: options.resumeAfterSelection ? 'scan' : 'manual',
+                    },
+                    'warning',
+                );
                 return {
                     status: 'invalid',
                 };
@@ -56,6 +84,10 @@ export function createScannerController({
 
             if (matchedResult.matches.length === 0) {
                 ui.showScanResult('not_found', matchedResult.cleanedId);
+                trackEvent('delivery_not_found', {
+                    source: options.resumeAfterSelection ? 'scan' : 'manual',
+                    transferId: matchedResult.cleanedId,
+                });
                 return {
                     status: 'not_found',
                     cleanedId: matchedResult.cleanedId,
@@ -66,13 +98,25 @@ export function createScannerController({
                 return processDeliveryScan(matchedResult.matches[0]);
             }
 
-            ui.showTransferSelectModal(matchedResult.matches, async (selected) => {
-                await processDeliveryScan(selected);
-
-                if (options.resumeAfterSelection) {
-                    camera.scheduleRestartIfAllowed(1000);
-                }
-            });
+            ui.showTransferSelectModal(
+                matchedResult.matches,
+                async (selected) => {
+                    try {
+                        await processDeliveryScan(selected);
+                    } finally {
+                        camera.resumeAfterSelection?.({
+                            cancelled: false,
+                            source: 'selection_resolved',
+                        });
+                    }
+                },
+                () => {
+                    camera.resumeAfterSelection?.({
+                        cancelled: true,
+                        source: 'selection_closed',
+                    });
+                },
+            );
 
             return {
                 status: 'selection_required',
@@ -80,6 +124,14 @@ export function createScannerController({
             };
         } catch (error) {
             console.error('Ошибка при поиске передачи:', error);
+            captureException(error, {
+                operation: 'process_transfer_id',
+                source: options.resumeAfterSelection ? 'scan' : 'manual',
+                transferId: transferId || '',
+                tags: {
+                    scope: 'scanner',
+                },
+            });
             ui.showScanResult('error', 'Ошибка при поиске', '', '', '');
 
             return {
@@ -93,23 +145,12 @@ export function createScannerController({
     }
 
     async function handleScanSuccess(decodedText) {
-        const now = Date.now();
-
-        if (now - state.lastScanTime < scanDelay) {
-            return;
-        }
-
-        state.lastScanTime = now;
-        navigator.vibrate?.(200);
-        ui.flashFrame();
-
         const result = await processTransferId(decodedText, {
             resumeAfterSelection: true,
         });
 
-        if (result?.status !== 'selection_required') {
-            camera.scheduleRestartIfAllowed(1000);
-        }
+        triggerScanFeedback(result?.status);
+        return result;
     }
 
     return {
