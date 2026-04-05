@@ -660,16 +660,24 @@ export async function openCourierPage({ service, ui, direction }) {
             await renderCourierList(await getCourierNames(service));
         } catch (error) {
             console.error('Ошибка обновления курьеров:', error);
+
+            if (!isPageHandleActive(page)) {
+                return;
+            }
+
+            // For offline or connection errors, try to show empty state instead of error
+            if (!navigator.onLine) {
+                listWrap.innerHTML = '';
+                appendEmptyState(listWrap, 'Нет подключения к интернету');
+                return;
+            }
+
             captureException(error, {
                 operation: 'refresh_courier_page',
                 tags: {
                     scope: 'couriers',
                 },
             });
-
-            if (!isPageHandleActive(page)) {
-                return;
-            }
 
             listWrap.innerHTML = '';
             appendEmptyState(listWrap, 'Не удалось обновить курьеров');
@@ -966,6 +974,8 @@ export async function openCourierPage({ service, ui, direction }) {
             );
         }
 
+        // Trigger initial load after subscriptions are set up
+        void refreshCourierList();
         return;
     }
 
@@ -973,16 +983,24 @@ export async function openCourierPage({ service, ui, direction }) {
         await renderCourierList(await getCourierNames(service));
     } catch (error) {
         console.error('Ошибка загрузки курьеров:', error);
+
+        if (!isPageHandleActive(page)) {
+            return;
+        }
+
+        // For offline or connection errors, show offline message instead of error
+        if (!navigator.onLine) {
+            listWrap.innerHTML = '';
+            appendEmptyState(listWrap, 'Нет подключения к интернету');
+            return;
+        }
+
         captureException(error, {
             operation: 'render_courier_page',
             tags: {
                 scope: 'couriers',
             },
         });
-
-        if (!isPageHandleActive(page)) {
-            return;
-        }
 
         listWrap.innerHTML = '';
         appendEmptyState(listWrap, 'Не удалось загрузить курьеров');
