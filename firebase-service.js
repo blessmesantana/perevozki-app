@@ -61,6 +61,15 @@ function isConnectivityError(error) {
     );
 }
 
+function withTimeout(promise, timeoutMs = 5000) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
+        ),
+    ]);
+}
+
 async function getPendingOfflineScansQueue() {
     if (Array.isArray(pendingOfflineScansCache)) {
         return pendingOfflineScansCache;
@@ -300,7 +309,11 @@ async function getCollection(path) {
     const requestVersion = currentVersion;
     const loadPromise = (async () => {
         try {
-            const snapshot = await get(query(ref(database, path)));
+            const timeoutDuration = !navigator.onLine ? 3000 : 8000;
+            const snapshot = await withTimeout(
+                get(query(ref(database, path))),
+                timeoutDuration,
+            );
             const items = await withOfflineSnapshot(path, snapshotToArray(snapshot));
 
             if (getCollectionVersion(path) === requestVersion) {
