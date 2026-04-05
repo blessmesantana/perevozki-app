@@ -308,8 +308,10 @@ async function getCollection(path) {
 
     const requestVersion = currentVersion;
     const loadPromise = (async () => {
+        let lastError = null;
+
         try {
-            const timeoutDuration = !navigator.onLine ? 3000 : 8000;
+            const timeoutDuration = !navigator.onLine ? 5000 : 10000;
             const snapshot = await withTimeout(
                 get(query(ref(database, path))),
                 timeoutDuration,
@@ -322,20 +324,28 @@ async function getCollection(path) {
 
             return freezeCollection(items);
         } catch (error) {
+            lastError = error;
+
             if (supportsOfflineSnapshot(path)) {
-                const offlineItems = await withOfflineSnapshot(
-                    path,
-                    await readOfflineCollectionSnapshot(path),
-                );
+                try {
+                    const offlineItems = await withOfflineSnapshot(
+                        path,
+                        await readOfflineCollectionSnapshot(path),
+                    );
 
-                if (getCollectionVersion(path) === requestVersion) {
-                    return setCollectionData(path, offlineItems, requestVersion);
+                    if (offlineItems && offlineItems.length > 0) {
+                        if (getCollectionVersion(path) === requestVersion) {
+                            return setCollectionData(path, offlineItems, requestVersion);
+                        }
+
+                        return freezeCollection(offlineItems);
+                    }
+                } catch (offlineError) {
+                    // Continue to throw the original error
                 }
-
-                return freezeCollection(offlineItems);
             }
 
-            throw error;
+            throw lastError;
         }
     })();
 
@@ -344,6 +354,18 @@ async function getCollection(path) {
     try {
         return await loadPromise;
     } catch (error) {
+        // For offline-supported collections, try fallback before clearing cache
+        if (supportsOfflineSnapshot(path)) {
+            try {
+                const fallbackItems = await readOfflineCollectionSnapshot(path);
+                if (fallbackItems && fallbackItems.length > 0) {
+                    return freezeCollection(fallbackItems);
+                }
+            } catch (fallbackError) {
+                // Continue with cache deletion
+            }
+        }
+
         collectionCache.delete(path);
         collectionIndexes.delete(path);
         throw error;
