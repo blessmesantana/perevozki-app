@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор иконок</title>
+    <script>
+        (() => {
+            try {
+                const theme = localStorage.getItem('appTheme');
+                const buttonPalette = localStorage.getItem('appButtonPalette');
+
+                if (theme === 'light' || theme === 'dark' || theme === 'blue') {
+                    document.documentElement.dataset.theme = theme;
+                }
+
+                if (
+                    buttonPalette === 'pink'
+                    || buttonPalette === 'platinum'
+                    || buttonPalette === 'gold'
+                    || buttonPalette === 'white'
+                ) {
+                    document.documentElement.dataset.buttonPalette = buttonPalette;
+                }
+            } catch (error) {}
+        })();
+    </script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body.icon-editor-body {
+            min-height: 100dvh;
+            margin: 0;
+            padding: 24px 16px 40px;
+            overflow-y: auto;
+            background:
+                radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 34%),
+                var(--color-screen-bg);
+        }
+
+        .icon-editor-shell {
+            width: min(1280px, 100%);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .icon-editor-header,
+        .icon-editor-panel,
+        .icon-editor-controls,
+        .icon-editor-output,
+        .icon-editor-icon-list,
+        .icon-editor-element-list,
+        .icon-editor-preview-stage {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .icon-editor-header { gap: 8px; }
+
+        .icon-editor-title {
+            color: var(--color-text-primary);
+            font: 700 28px 'Inter', sans-serif;
+        }
+
+        .icon-editor-subtitle,
+        .icon-editor-panel-note,
+        .icon-editor-icon-note,
+        .icon-editor-element-note,
+        .icon-editor-preview-note,
+        .icon-editor-copy-status {
+            color: var(--color-text-secondary);
+            font: 500 12px 'Inter', sans-serif;
+            line-height: 1.45;
+        }
+
+        .icon-editor-subtitle { max-width: 780px; font-size: 13px; }
+
+        .icon-editor-layout {
+            display: grid;
+            grid-template-columns: minmax(240px, 300px) minmax(340px, 1fr) minmax(300px, 360px);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .icon-editor-panel {
+            gap: 12px;
+            padding: 16px;
+            border-radius: 28px;
+            background: var(--color-surface);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .icon-editor-panel-title {
+            color: var(--color-text-primary);
+            font: 700 15px 'Inter', sans-serif;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .icon-editor-icon-list,
+        .icon-editor-element-list { gap: 8px; }
+
+        .icon-editor-icon-button,
+        .icon-editor-element-button,
+        .icon-editor-action-button,
+        .icon-editor-copy-button {
+            border: none;
+            width: 100%;
+            border-radius: 18px;
+            color: var(--color-text-primary);
+            background: var(--color-surface-soft);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        .icon-editor-icon-button,
+        .icon-editor-element-button {
+            display: grid;
+            grid-template-columns: 48px 1fr;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 12px;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .icon-editor-icon-button:hover,
+        .icon-editor-element-button:hover,
+        .icon-editor-action-button:hover,
+        .icon-editor-copy-button:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .icon-editor-icon-button.is-active,
+        .icon-editor-element-button.is-active {
+            background: var(--color-primary-soft);
+            color: var(--color-primary-text);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 12px 26px rgba(0, 0, 0, 0.16);
+        }
+
+        .icon-editor-icon-preview {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.06);
+            color: currentColor;
+        }
+
+        .icon-editor-icon-preview svg {
+            display: block;
+            max-width: 28px;
+            max-height: 28px;
+        }
+
+        .icon-editor-icon-meta,
+        .icon-editor-element-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .icon-editor-icon-label,
+        .icon-editor-element-label,
+        .icon-editor-preview-title {
+            color: inherit;
+            font: 700 14px 'Inter', sans-serif;
+            line-height: 1.2;
+        }
+
+        .icon-editor-preview-title {
+            color: var(--color-text-primary);
+            font-size: 20px;
+            text-align: center;
+        }
+
+        .icon-editor-preview-stage {
+            gap: 14px;
+            align-items: center;
+        }
+
+        .icon-editor-preview-frame {
+            width: min(100%, 420px);
+            aspect-ratio: 1 / 1;
+            border-radius: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            overflow: hidden;
+            background: radial-gradient(circle at top, rgba(255, 255, 255, 0.05), transparent 42%), var(--color-surface);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 30px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .icon-editor-preview-frame svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+            color: var(--color-text-primary);
+            overflow: visible;
+        }
+
+        .icon-editor-preview-svg [data-element-id] {
+            cursor: pointer;
+            transition: opacity 0.16s ease, filter 0.16s ease;
+        }
+
+        .icon-editor-preview-svg [data-element-id]:hover {
+            filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.18));
+        }
+
+        .icon-editor-preview-svg [data-element-id].is-selected {
+            stroke: #ffd166 !important;
+            fill: #ffd166 !important;
+            filter: drop-shadow(0 0 10px rgba(255, 209, 102, 0.3));
+        }
+
+        .icon-editor-control { display: flex; flex-direction: column; gap: 8px; }
+        .icon-editor-control-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .icon-editor-control-label {
+            color: var(--color-text-primary);
+            font: 700 13px 'Inter', sans-serif;
+        }
+
+        .icon-editor-control-value {
+            color: var(--color-text-secondary);
+            font: 600 12px 'Inter', sans-serif;
+            min-width: 56px;
+            text-align: right;
+        }
+
+        .icon-editor-control input[type="range"] { width: 100%; accent-color: var(--color-primary); }
+
+        .icon-editor-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .icon-editor-action-button,
+        .icon-editor-copy-button {
+            padding: 11px 14px;
+            cursor: pointer;
+            font: 700 13px 'Inter', sans-serif;
+        }
+
+        .icon-editor-output { gap: 10px; }
+
+        .icon-editor-output textarea {
+            width: 100%;
+            min-height: 280px;
+            resize: vertical;
+            border: none;
+            outline: none;
+            border-radius: 18px;
+            padding: 14px;
+            color: var(--color-text-primary);
+            background: rgba(0, 0, 0, 0.16);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+            font: 500 12px/1.45 'SFMono-Regular', Consolas, monospace;
+        }
+
+        .icon-editor-copy-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .icon-editor-measure {
+            position: absolute;
+            width: 0;
+            height: 0;
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        @media (max-width: 1080px) {
+            .icon-editor-layout { grid-template-columns: 1fr; }
+            .icon-editor-preview-frame { width: 100%; }
+        }
+    </style>
+</head>
+<body class="icon-editor-body">
+    <div class="icon-editor-shell">
+        <header class="icon-editor-header">
+            <div class="icon-editor-title">Редактор иконок</div>
+            <div class="icon-editor-subtitle">
+                Выбери иконку, затем нужный элемент внутри SVG и подгоняй его ползунками. Код ниже
+                уже готов к копированию обратно в проект. Автозаписи в файлы нет.
+            </div>
+        </header>
+
+        <main class="icon-editor-layout">
+            <section class="icon-editor-panel">
+                <div class="icon-editor-panel-title">Иконки</div>
+                <div class="icon-editor-panel-note">Все актуальные пользовательские SVG-иконки приложения без служебных QR-кодов.</div>
+                <div id="iconList" class="icon-editor-icon-list"></div>
+            </section>
+
+            <section class="icon-editor-panel">
+                <div class="icon-editor-panel-title">Превью</div>
+                <div class="icon-editor-panel-note">Кликни по части иконки прямо здесь или выбери её из списка справа.</div>
+                <div class="icon-editor-preview-stage">
+                    <div id="previewTitle" class="icon-editor-preview-title"></div>
+                    <div id="previewNote" class="icon-editor-preview-note"></div>
+                    <div id="previewFrame" class="icon-editor-preview-frame"></div>
+                </div>
+            </section>
+
+            <section class="icon-editor-panel">
+                <div class="icon-editor-panel-title">Элемент</div>
+                <div class="icon-editor-panel-note">Редактирование применяется только к выбранной части иконки.</div>
+                <div id="elementList" class="icon-editor-element-list"></div>
+
+                <div class="icon-editor-controls">
+                    <label class="icon-editor-control">
+                        <div class="icon-editor-control-header">
+                            <span class="icon-editor-control-label">Координата X</span>
+                            <span id="valueOffsetX" class="icon-editor-control-value">0</span>
+                        </div>
+                        <input id="controlOffsetX" type="range" min="-8" max="8" step="0.05" value="0">
+                    </label>
+
+                    <label class="icon-editor-control">
+                        <div class="icon-editor-control-header">
+                            <span class="icon-editor-control-label">Координата Y</span>
+                            <span id="valueOffsetY" class="icon-editor-control-value">0</span>
+                        </div>
+                        <input id="controlOffsetY" type="range" min="-8" max="8" step="0.05" value="0">
+                    </label>
+
+                    <label class="icon-editor-control">
+                        <div class="icon-editor-control-header">
+                            <span class="icon-editor-control-label">Длина</span>
+                            <span id="valueScaleX" class="icon-editor-control-value">1</span>
+                        </div>
+                        <input id="controlScaleX" type="range" min="0.2" max="3" step="0.01" value="1">
+                    </label>
+
+                    <label class="icon-editor-control">
+                        <div class="icon-editor-control-header">
+                            <span class="icon-editor-control-label">Ширина</span>
+                            <span id="valueScaleY" class="icon-editor-control-value">1</span>
+                        </div>
+                        <input id="controlScaleY" type="range" min="0.2" max="3" step="0.01" value="1">
+                    </label>
+
+                    <label class="icon-editor-control">
+                        <div class="icon-editor-control-header">
+                            <span class="icon-editor-control-label">Вращение</span>
+                            <span id="valueRotation" class="icon-editor-control-value">0°</span>
+                        </div>
+                        <input id="controlRotation" type="range" min="0" max="360" step="1" value="0">
+                    </label>
+                </div>
+
+                <div class="icon-editor-actions">
+                    <button id="resetElementButton" class="icon-editor-action-button" type="button">Сбросить элемент</button>
+                    <button id="resetIconButton" class="icon-editor-action-button" type="button">Сбросить иконку</button>
+                </div>
+            </section>
+        </main>
+
+        <section class="icon-editor-panel">
+            <div class="icon-editor-panel-title">SVG-код</div>
+            <div class="icon-editor-output">
+                <textarea id="svgOutput" readonly spellcheck="false"></textarea>
+                <div class="icon-editor-copy-row">
+                    <button id="copySvgButton" class="icon-editor-copy-button" type="button">Копировать SVG</button>
+                    <div id="copyStatus" class="icon-editor-copy-status"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="measureHost" class="icon-editor-measure" aria-hidden="true"></div>
+
+    <script>
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const ICON_SOURCES = [
+    {
+        id: 'data',
+        label: 'Данные',
+        note: 'Нижний бар',
+        width: 22,
+        height: 22,
+        viewBox: '0 0 24 24',
+        markup: `
+            <rect x="5" y="3.5" width="14" height="17" rx="2.5" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M9 8.5H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M9 12H15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M9 15.5H13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'couriers',
+        label: 'Курьеры',
+        note: 'Нижний бар',
+        width: 22,
+        height: 22,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M18.25 11C19.9068 11 21.25 9.65685 21.25 8C21.25 6.34315 19.9068 5 18.25 5C16.5931 5 15.25 6.34315 15.25 8C15.25 9.65685 16.5931 11 18.25 11Z" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M7.1 11C8.75685 11 10.1 9.65685 10.1 8C10.1 6.34315 8.75685 5 7.1 5C5.44315 5 4.1 6.34315 4.1 8C4.1 9.65685 5.44315 11 7.1 11Z" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M2.5 18C2.5 15.7909 4.29086 14 6.5 14H7.5C9.70914 14 11.5 15.7909 11.5 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M13.75 18C13.75 15.7909 15.5409 14 17.75 14H18.75C20.9591 14 22.75 15.7909 22.75 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'qr',
+        label: 'QR',
+        note: 'Нижний бар',
+        width: 22,
+        height: 22,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M7 12H12V17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 12H3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M8 17H8.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 21H12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M21 12H21.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M3 17H4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M15.5 12H17.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M3 21H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 2V8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M17.6 21H19.4C19.96 21 20.24 21 20.454 20.891C20.6422 20.7951 20.7951 20.6422 20.891 20.454C21 20.2401 21 19.96 21 19.4V17.6C21 17.04 21 16.7599 20.891 16.546C20.7951 16.3578 20.6422 16.2049 20.454 16.109C20.2401 16 19.96 16 19.4 16H17.6C17.04 16 16.7599 16 16.546 16.109C16.3578 16.2049 16.2049 16.3578 16.109 16.546C16 16.7599 16 17.04 16 17.6V19.4C16 19.96 16 20.2401 16.109 20.454C16.2049 20.6422 16.3578 20.7951 16.546 20.891C16.7599 21 17.04 21 17.6 21Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M17.6 8H19.4C19.96 8 20.2401 8 20.454 7.89101C20.6422 7.79513 20.7951 7.64215 20.891 7.45399C21 7.24008 21 6.96005 21 6.4V4.6C21 4.03995 21 3.75992 20.891 3.54601C20.7951 3.35785 20.6422 3.20487 20.454 3.10899C20.2401 3 19.9601 3 19.4 3H17.6C17.0399 3 16.7599 3 16.546 3.10899C16.3578 3.20487 16.2049 3.35785 16.109 3.54601C16 3.75992 16 4.03995 16 4.6V6.4C16 6.96005 16 7.24008 16.109 7.45399C16.2049 7.64215 16.3578 7.79513 16.546 7.89101C16.7599 8 17.0399 8 17.6 8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M4.6 8H6.4C6.96005 8 7.24008 8 7.45399 7.89101C7.64215 7.79513 7.79513 7.64215 7.89101 7.45399C8 7.24008 8 6.96005 8 6.4V4.6C8 4.03995 8 3.75992 7.89101 3.54601C7.79513 3.35785 7.64215 3.20487 7.45399 3.10899C7.24008 3 6.96005 3 6.4 3H4.6C4.03995 3 3.75992 3 3.54601 3.10899C3.35785 3.20487 3.20487 3.35785 3.10899 3.54601C3 3.75992 3 4.03995 3 4.6V6.4C3 6.96005 3 7.24008 3.10899 7.45399C3.20487 7.64215 3.35785 7.79513 3.54601 7.89101C3.75992 8 4.03995 8 4.6 8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        `,
+    },
+    {
+        id: 'shk',
+        label: 'ШК',
+        note: 'Нижний бар',
+        width: 22,
+        height: 22,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M4.5 5.5V18.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M7 8.5V15.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M9.5 5.5V18.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M12 8.5V15.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M14.5 5.5V18.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M17 8.5V15.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M19.5 5.5V18.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'settings',
+        label: 'Настройки',
+        note: 'Нижний бар',
+        width: 22,
+        height: 22,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M12 8.75C10.2051 8.75 8.75 10.2051 8.75 12C8.75 13.7949 10.2051 15.25 12 15.25C13.7949 15.25 15.25 13.7949 15.25 12C15.25 10.2051 13.7949 8.75 12 8.75Z" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M19 12C19 11.5498 18.9639 11.108 18.8945 10.6777L20.5 9.42871L18.5713 6.08301L16.6328 6.75293C15.9586 6.22377 15.1927 5.80739 14.3682 5.53125L14.0625 3.5H9.9375L9.63184 5.53125C8.80734 5.80739 8.04143 6.22377 7.36719 6.75293L5.42871 6.08301L3.5 9.42871L5.10547 10.6777C5.03614 11.108 5 11.5498 5 12C5 12.4502 5.03614 12.892 5.10547 13.3223L3.5 14.5713L5.42871 17.917L7.36719 17.2471C8.04143 17.7762 8.80734 18.1926 9.63184 18.4688L9.9375 20.5H14.0625L14.3682 18.4688C15.1927 18.1926 15.9586 17.7762 16.6328 17.2471L18.5713 17.917L20.5 14.5713L18.8945 13.3223C18.9639 12.892 19 12.4502 19 12Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        `,
+    },
+    {
+        id: 'camera',
+        label: 'Камера',
+        note: 'Настройки',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M4 8.5C4 7.67157 4.67157 7 5.5 7H8L9.4 5.6C9.77574 5.22426 10.2852 5 10.8166 5H13.1834C13.7148 5 14.2243 5.22426 14.6 5.6L16 7H18.5C19.3284 7 20 7.67157 20 8.5V16.5C20 17.3284 19.3284 18 18.5 18H5.5C4.67157 18 4 17.3284 4 16.5V8.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M12 14.75C13.5188 14.75 14.75 13.5188 14.75 12C14.75 10.4812 13.5188 9.25 12 9.25C10.4812 9.25 9.25 10.4812 9.25 12C9.25 13.5188 10.4812 14.75 12 14.75Z" stroke="currentColor" stroke-width="1.8"/>
+        `,
+    },
+    {
+        id: 'whats-new',
+        label: 'Что нового?',
+        note: 'Настройки',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M12 4V6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 18V20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M4 12H6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M18 12H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M6.35 6.35L7.76 7.76" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M16.24 16.24L17.65 17.65" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M17.65 6.35L16.24 7.76" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M7.76 16.24L6.35 17.65" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <path d="M12 9.25V12.25L14 13.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 17.5C15.0376 17.5 17.5 15.0376 17.5 12C17.5 8.96243 15.0376 6.5 12 6.5C8.96243 6.5 6.5 8.96243 6.5 12C6.5 15.0376 8.96243 17.5 12 17.5Z" stroke="currentColor" stroke-width="1.8"/>
+        `,
+    },
+    {
+        id: 'help',
+        label: 'Справка',
+        note: 'Настройки',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M6 5.5C6 4.67157 6.67157 4 7.5 4H18V18.5H8.75C8.05842 18.5 7.5 19.0584 7.5 19.75C7.5 20.4416 8.05842 21 8.75 21H18" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M6 5.5V19.5C6 20.3284 5.32843 21 4.5 21H4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9.5 8H14.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M9.5 11H15.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M9.5 14H13.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'back',
+        label: 'Назад',
+        note: 'Внутренние страницы',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 24 24',
+        markup: `
+            <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        `,
+    },
+    {
+        id: 'trash',
+        label: 'Корзина',
+        note: 'Удаление передачи',
+        width: 22,
+        height: 22,
+        viewBox: '0 0 20 20',
+        markup: `
+            <rect x="5.2" y="6.8" width="9.6" height="9.2" rx="2.1" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M3.8 6.8H16.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M7.4 4.6C7.4 3.94 7.94 3.4 8.6 3.4H11.4C12.06 3.4 12.6 3.94 12.6 4.6V6.8H7.4V4.6Z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8.4 9V13.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M11.6 9V13.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'new-badge',
+        label: 'New',
+        note: 'Бейдж обновления',
+        width: 26,
+        height: 18,
+        viewBox: '0 0 28 20',
+        markup: `
+            <path d="M11.8 1.8L13.7 6.9L18.8 8.8L13.7 10.7L11.8 15.8L9.9 10.7L4.8 8.8L9.9 6.9L11.8 1.8Z" fill="currentColor"/>
+            <path d="M22.2 2.8L23.1 5.2L25.5 6.1L23.1 7L22.2 9.4L21.3 7L18.9 6.1L21.3 5.2L22.2 2.8Z" fill="currentColor" opacity="0.9"/>
+            <path d="M5.2 11.3L6.2 13.9L8.8 14.9L6.2 15.9L5.2 18.5L4.2 15.9L1.6 14.9L4.2 13.9L5.2 11.3Z" fill="currentColor" opacity="0.82"/>
+        `,
+    },
+    {
+        id: 'gate',
+        label: 'Ворота',
+        note: 'Раздел ШК',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <path d="M4.6 16V8.1C4.6 6.39 5.99 5 7.7 5H12.3C14.01 5 15.4 6.39 15.4 8.1V16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6.1 12.9H13.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M8.9 10.8L11.1 10.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'buffer',
+        label: 'Буфер',
+        note: 'Раздел ШК',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <rect x="3" y="3" width="5" height="5" rx="1.4" stroke="currentColor" stroke-width="1.7"/>
+            <rect x="12" y="3" width="5" height="5" rx="1.4" stroke="currentColor" stroke-width="1.7"/>
+            <rect x="3" y="12" width="5" height="5" rx="1.4" stroke="currentColor" stroke-width="1.7"/>
+            <rect x="12" y="12" width="5" height="5" rx="1.4" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M8 5.5H12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" transform="translate(0 4.45)"/>
+            <path d="M10 8V12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        `,
+    },
+    {
+        id: 'interwarehouse',
+        label: 'Межсклад V1',
+        note: 'Раздел ШК • текущий',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <path d="M3.75 7L6.75 5.25L9.75 7V12.75L6.75 14.5L3.75 12.75V7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" transform="translate(-1.75 0) translate(6.75 9.88) scale(0.8 0.8) translate(-6.75 -9.88)"/>
+            <path d="M10.25 7L13.25 5.25L16.25 7V12.75L13.25 14.5L10.25 12.75V7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" transform="translate(1.75 0) translate(13.25 9.88) scale(0.8 0.8) translate(-13.25 -9.88)"/>
+            <path d="M8.75 10H11.25" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" transform="translate(10 10) scale(0.7 0.7) translate(-10 -10)"/>
+            <path d="M10.15 8.8L11.35 10L10.15 11.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(10.75 10) scale(0.7 0.7) translate(-10.75 -10)"/>
+        `,
+    },
+    {
+        id: 'interwarehouse_boxes',
+        label: 'Межсклад V2',
+        note: 'Раздел ШК • две коробки',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <path d="M3.75 7L6.75 5.25L9.75 7V12.75L6.75 14.5L3.75 12.75V7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M10.25 7L13.25 5.25L16.25 7V12.75L13.25 14.5L10.25 12.75V7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M8.75 10H11.25" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M10.15 8.8L11.35 10L10.15 11.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        `,
+    },
+    {
+        id: 'interwarehouse_gates',
+        label: 'Межсклад V3',
+        note: 'Раздел ШК • две стойки',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <path d="M3.75 15.75V8C3.75 6.48122 4.98122 5.25 6.5 5.25H7.5V15.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12.5 5.25H13.5C15.0188 5.25 16.25 6.48122 16.25 8V15.75" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.4 7.85H11.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M9.8 6.45L8.4 7.85L9.8 9.25" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M10.2 10.85L11.6 12.25L10.2 13.65" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        `,
+    },
+    {
+        id: 'interwarehouse_cube',
+        label: 'Межсклад V4',
+        note: 'Раздел ШК • куб и переход',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <path d="M10 3.4L15.75 6.7V13.3L10 16.6L4.25 13.3V6.7L10 3.4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M10 3.4V16.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M4.25 6.7L10 10L15.75 6.7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M7.6 10H12.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M10.95 8.65L12.35 10L10.95 11.35" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        `,
+    },
+    {
+        id: 'shipping',
+        label: 'Отгрузка',
+        note: 'Раздел ШК',
+        width: 26,
+        height: 26,
+        viewBox: '0 0 20 20',
+        markup: `
+            <path d="M4 6.25L10 3L16 6.25V13.75L10 17L4 13.75V6.25Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M10 3V17" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M4 6.25L10 9.5L16 6.25" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        `,
+    },
+];
+
+function parseElements(markup) {
+    const wrapper = document.createElementNS(SVG_NS, 'svg');
+    wrapper.innerHTML = markup.trim();
+    const counts = {};
+
+    return Array.from(wrapper.children).map((node) => {
+        const type = node.tagName.toLowerCase();
+        counts[type] = (counts[type] || 0) + 1;
+        const attrs = {};
+
+        Array.from(node.attributes).forEach((attribute) => {
+            attrs[attribute.name] = attribute.value;
+        });
+
+        return {
+            id: `${type}-${counts[type]}`,
+            label: `${type} ${counts[type]}`,
+            type,
+            attrs,
+            controls: { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1, rotation: 0 },
+            metrics: null,
+        };
+    });
+}
+
+const editorState = {
+    icons: ICON_SOURCES.map((icon) => ({ ...icon, elements: parseElements(icon.markup) })),
+    activeIconId: ICON_SOURCES[0].id,
+    activeElementId: null,
+};
+
+const iconList = document.getElementById('iconList');
+const previewTitle = document.getElementById('previewTitle');
+const previewNote = document.getElementById('previewNote');
+const previewFrame = document.getElementById('previewFrame');
+const elementList = document.getElementById('elementList');
+const svgOutput = document.getElementById('svgOutput');
+const copySvgButton = document.getElementById('copySvgButton');
+const copyStatus = document.getElementById('copyStatus');
+const measureHost = document.getElementById('measureHost');
+
+const controlOffsetX = document.getElementById('controlOffsetX');
+const controlOffsetY = document.getElementById('controlOffsetY');
+const controlScaleX = document.getElementById('controlScaleX');
+const controlScaleY = document.getElementById('controlScaleY');
+const controlRotation = document.getElementById('controlRotation');
+
+const valueOffsetX = document.getElementById('valueOffsetX');
+const valueOffsetY = document.getElementById('valueOffsetY');
+const valueScaleX = document.getElementById('valueScaleX');
+const valueScaleY = document.getElementById('valueScaleY');
+const valueRotation = document.getElementById('valueRotation');
+
+function getActiveIcon() {
+    return editorState.icons.find((icon) => icon.id === editorState.activeIconId);
+}
+
+function getActiveElement() {
+    const icon = getActiveIcon();
+    return icon.elements.find((element) => element.id === editorState.activeElementId);
+}
+
+function ensureActiveElement() {
+    const icon = getActiveIcon();
+    if (!icon.elements.some((element) => element.id === editorState.activeElementId)) {
+        editorState.activeElementId = icon.elements[0]?.id || null;
+    }
+}
+
+function createSvgNode(type, attrs) {
+    const node = document.createElementNS(SVG_NS, type);
+    Object.entries(attrs).forEach(([name, value]) => node.setAttribute(name, value));
+    return node;
+}
+
+function formatNumber(value, digits = 2) {
+    const rounded = Number(value.toFixed(digits));
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+function measureElement(icon, element) {
+    if (element.metrics) {
+        return element.metrics;
+    }
+
+    measureHost.innerHTML = '';
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', icon.viewBox);
+    svg.setAttribute('width', icon.width);
+    svg.setAttribute('height', icon.height);
+    const node = createSvgNode(element.type, element.attrs);
+    svg.appendChild(node);
+    measureHost.appendChild(svg);
+
+    const box = node.getBBox();
+    element.metrics = {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+        centerX: box.x + box.width / 2,
+        centerY: box.y + box.height / 2,
+    };
+    return element.metrics;
+}
+
+function buildTransform(icon, element) {
+    const { offsetX, offsetY, scaleX, scaleY, rotation } = element.controls;
+    const metrics = measureElement(icon, element);
+    const parts = [];
+
+    if (offsetX !== 0 || offsetY !== 0) {
+        parts.push(`translate(${formatNumber(offsetX)} ${formatNumber(offsetY)})`);
+    }
+
+    if (rotation !== 0 || scaleX !== 1 || scaleY !== 1) {
+        parts.push(`translate(${formatNumber(metrics.centerX)} ${formatNumber(metrics.centerY)})`);
+        if (rotation !== 0) {
+            parts.push(`rotate(${formatNumber(rotation, 1)})`);
+        }
+        if (scaleX !== 1 || scaleY !== 1) {
+            parts.push(`scale(${formatNumber(scaleX)} ${formatNumber(scaleY)})`);
+        }
+        parts.push(`translate(${formatNumber(-metrics.centerX)} ${formatNumber(-metrics.centerY)})`);
+    }
+
+    return parts.join(' ');
+}
+
+function getElementCenter(icon, element) {
+    const metrics = measureElement(icon, element);
+    return {
+        x: metrics.centerX + element.controls.offsetX,
+        y: metrics.centerY + element.controls.offsetY,
+    };
+}
+
+function renderIconPreviewSvg(icon, selectedElementId = null, allowSelection = false) {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.classList.add('icon-editor-preview-svg');
+    svg.setAttribute('viewBox', icon.viewBox);
+    svg.setAttribute('width', icon.width);
+    svg.setAttribute('height', icon.height);
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('xmlns', SVG_NS);
+
+    icon.elements.forEach((element) => {
+        const node = createSvgNode(element.type, element.attrs);
+        const transform = buildTransform(icon, element);
+
+        if (transform) {
+            node.setAttribute('transform', transform);
+        }
+
+        node.dataset.elementId = element.id;
+
+        if (element.id === selectedElementId) {
+            node.classList.add('is-selected');
+        }
+
+        if (allowSelection) {
+            node.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                editorState.activeElementId = element.id;
+                renderAll();
+            });
+        }
+
+        svg.appendChild(node);
+    });
+
+    if (allowSelection && selectedElementId) {
+        const selectedElement = icon.elements.find((element) => element.id === selectedElementId);
+        if (selectedElement) {
+            const center = getElementCenter(icon, selectedElement);
+            const overlay = document.createElementNS(SVG_NS, 'g');
+            overlay.classList.add('icon-editor-center-marker');
+
+            const horizontal = document.createElementNS(SVG_NS, 'path');
+            horizontal.setAttribute('d', `M${formatNumber(center.x - 0.6)} ${formatNumber(center.y)}H${formatNumber(center.x + 0.6)}`);
+            horizontal.setAttribute('stroke', '#ff6b6b');
+            horizontal.setAttribute('stroke-width', '0.3');
+            horizontal.setAttribute('stroke-linecap', 'round');
+
+            const vertical = document.createElementNS(SVG_NS, 'path');
+            vertical.setAttribute('d', `M${formatNumber(center.x)} ${formatNumber(center.y - 0.6)}V${formatNumber(center.y + 0.6)}`);
+            vertical.setAttribute('stroke', '#ff6b6b');
+            vertical.setAttribute('stroke-width', '0.3');
+            vertical.setAttribute('stroke-linecap', 'round');
+
+            const circle = document.createElementNS(SVG_NS, 'circle');
+            circle.setAttribute('cx', formatNumber(center.x));
+            circle.setAttribute('cy', formatNumber(center.y));
+            circle.setAttribute('r', '0.35');
+            circle.setAttribute('fill', '#ff6b6b');
+
+            overlay.appendChild(horizontal);
+            overlay.appendChild(vertical);
+            overlay.appendChild(circle);
+            svg.appendChild(overlay);
+        }
+    }
+
+    return svg;
+}
+
+function renderIconList() {
+    iconList.innerHTML = '';
+    editorState.icons.forEach((icon) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'icon-editor-icon-button';
+        if (icon.id === editorState.activeIconId) {
+            button.classList.add('is-active');
+        }
+
+        const preview = document.createElement('span');
+        preview.className = 'icon-editor-icon-preview';
+        preview.appendChild(renderIconPreviewSvg(icon));
+
+        const meta = document.createElement('span');
+        meta.className = 'icon-editor-icon-meta';
+        meta.innerHTML = `<span class="icon-editor-icon-label">${icon.label}</span><span class="icon-editor-icon-note">${icon.note}</span>`;
+
+        button.appendChild(preview);
+        button.appendChild(meta);
+        button.addEventListener('click', () => {
+            editorState.activeIconId = icon.id;
+            ensureActiveElement();
+            copyStatus.textContent = '';
+            renderAll();
+        });
+
+        iconList.appendChild(button);
+    });
+}
+
+function renderElementList() {
+    const icon = getActiveIcon();
+    elementList.innerHTML = '';
+
+    icon.elements.forEach((element) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'icon-editor-element-button';
+        if (element.id === editorState.activeElementId) {
+            button.classList.add('is-active');
+        }
+
+        const preview = document.createElement('span');
+        preview.className = 'icon-editor-icon-preview';
+        preview.style.width = '42px';
+        preview.style.height = '42px';
+        preview.style.borderRadius = '14px';
+        preview.appendChild(renderIconPreviewSvg({ ...icon, elements: [element] }));
+
+        const meta = document.createElement('span');
+        meta.className = 'icon-editor-element-meta';
+        meta.innerHTML = `<span class="icon-editor-element-label">${element.label}</span><span class="icon-editor-element-note">Тип: ${element.type}</span>`;
+
+        button.appendChild(preview);
+        button.appendChild(meta);
+        button.addEventListener('click', () => {
+            editorState.activeElementId = element.id;
+            renderAll();
+        });
+
+        elementList.appendChild(button);
+    });
+}
+
+function renderPreview() {
+    const icon = getActiveIcon();
+    previewTitle.textContent = icon.label;
+    previewNote.textContent = icon.note;
+    previewFrame.innerHTML = '';
+    previewFrame.appendChild(renderIconPreviewSvg(icon, editorState.activeElementId, true));
+}
+
+function syncControls() {
+    const element = getActiveElement();
+    if (!element) {
+        return;
+    }
+
+    controlOffsetX.value = element.controls.offsetX;
+    controlOffsetY.value = element.controls.offsetY;
+    controlScaleX.value = element.controls.scaleX;
+    controlScaleY.value = element.controls.scaleY;
+    controlRotation.value = element.controls.rotation;
+
+    valueOffsetX.textContent = formatNumber(element.controls.offsetX);
+    valueOffsetY.textContent = formatNumber(element.controls.offsetY);
+    valueScaleX.textContent = formatNumber(element.controls.scaleX);
+    valueScaleY.textContent = formatNumber(element.controls.scaleY);
+    valueRotation.textContent = `${formatNumber(element.controls.rotation, 1)}°`;
+}
+
+function buildSvgOutput(icon) {
+    const lines = [];
+    lines.push(`<svg width="${icon.width}" height="${icon.height}" viewBox="${icon.viewBox}" fill="none" xmlns="${SVG_NS}">`);
+
+    icon.elements.forEach((element) => {
+        const attrs = { ...element.attrs };
+        const transform = buildTransform(icon, element);
+
+        if (transform) {
+            attrs.transform = transform;
+        }
+
+        const attrString = Object.entries(attrs)
+            .map(([name, value]) => `${name}="${String(value).replace(/"/g, '&quot;')}"`)
+            .join(' ');
+
+        lines.push(`    <${element.type} ${attrString}></${element.type}>`);
+    });
+
+    lines.push('</svg>');
+    return lines.join('\n');
+}
+
+function renderOutput() {
+    svgOutput.value = buildSvgOutput(getActiveIcon());
+}
+
+function renderAll() {
+    ensureActiveElement();
+    renderIconList();
+    renderElementList();
+    renderPreview();
+    syncControls();
+    renderOutput();
+}
+
+function bindControl(input, key, integer = false) {
+    input.addEventListener('input', () => {
+        const element = getActiveElement();
+        if (!element) {
+            return;
+        }
+
+        element.controls[key] = Number(input.value);
+        if (integer) {
+            element.controls[key] = Math.round(element.controls[key]);
+        }
+
+        renderAll();
+    });
+}
+
+bindControl(controlOffsetX, 'offsetX');
+bindControl(controlOffsetY, 'offsetY');
+bindControl(controlScaleX, 'scaleX');
+bindControl(controlScaleY, 'scaleY');
+bindControl(controlRotation, 'rotation', true);
+
+document.getElementById('resetElementButton').addEventListener('click', () => {
+    const element = getActiveElement();
+    if (!element) {
+        return;
+    }
+
+    element.controls = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+    renderAll();
+});
+
+document.getElementById('resetIconButton').addEventListener('click', () => {
+    const icon = getActiveIcon();
+    icon.elements.forEach((element) => {
+        element.controls = { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+    });
+    renderAll();
+});
+
+copySvgButton.addEventListener('click', async () => {
+    try {
+        await navigator.clipboard.writeText(svgOutput.value);
+        copyStatus.textContent = 'SVG скопирован';
+    } catch (error) {
+        svgOutput.select();
+        document.execCommand('copy');
+        copyStatus.textContent = 'SVG скопирован';
+    }
+});
+
+ensureActiveElement();
+renderAll();
+    </script>
+</body>
+</html>

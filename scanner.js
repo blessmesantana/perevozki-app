@@ -45,8 +45,14 @@ export function createScannerController({
             };
         }
 
-        await service.saveScan(delivery.id, delivery.courier_name, Date.now());
+        const savedScan = await service.saveScan(delivery.id, delivery.courier_name, Date.now());
         ui.showScanResult('success', delivery.id, delivery.courier_name);
+
+        if (savedScan?.offlineQueued) {
+            ui.showToast('Скан сохранён офлайн и будет отправлен позже', {
+                duration: 2200,
+            });
+        }
 
         return {
             status: 'success',

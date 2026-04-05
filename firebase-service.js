@@ -5,6 +5,12 @@ import {
 } from './deliveries.js';
 import { captureException } from './logger.js';
 import {
+    readOfflineCollectionSnapshot,
+    readPendingOfflineScans,
+    writeOfflineCollectionSnapshot,
+    writePendingOfflineScans,
+} from './offline-store.js';
+import {
     get,
     onValue,
     push,
@@ -19,9 +25,106 @@ const collectionVersions = new Map();
 const collectionIndexes = new Map();
 const EMPTY_COLLECTION = Object.freeze([]);
 const DELIVERY_SHORT_ID_LENGTH = 4;
+const OFFLINE_SUPPORTED_COLLECTIONS = new Set(['couriers', 'deliveries', 'scans']);
+let pendingOfflineScansCache = null;
+let pendingOfflineScansPromise = null;
 
 function normalizeCourierName(value) {
     return String(value || '').trim().toLocaleLowerCase('ru-RU');
+}
+
+function supportsOfflineSnapshot(path) {
+    return OFFLINE_SUPPORTED_COLLECTIONS.has(path);
+}
+
+function cloneItem(record) {
+    return record ? { ...record } : record;
+}
+
+function createOfflineScanKey(timestamp = Date.now()) {
+    return `offline:${timestamp}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isConnectivityError(error) {
+    if (!navigator.onLine) {
+        return true;
+    }
+
+    const fingerprint = `${error?.code || ''} ${error?.name || ''} ${error?.message || ''}`
+        .toLowerCase();
+
+    return (
+        fingerprint.includes('network')
+        || fingerprint.includes('offline')
+        || fingerprint.includes('unavailable')
+        || fingerprint.includes('fetch')
+    );
+}
+
+async function getPendingOfflineScansQueue() {
+    if (Array.isArray(pendingOfflineScansCache)) {
+        return pendingOfflineScansCache;
+    }
+
+    if (!pendingOfflineScansPromise) {
+        pendingOfflineScansPromise = readPendingOfflineScans()
+            .then((items) => {
+                pendingOfflineScansCache = Array.isArray(items) ? items : [];
+                return pendingOfflineScansCache;
+            })
+            .catch(() => {
+                pendingOfflineScansCache = [];
+                return pendingOfflineScansCache;
+            })
+            .finally(() => {
+                pendingOfflineScansPromise = null;
+            });
+    }
+
+    return pendingOfflineScansPromise;
+}
+
+async function persistPendingOfflineScansQueue(items) {
+    pendingOfflineScansCache = Array.isArray(items)
+        ? items.map((item) => cloneItem(item))
+        : [];
+    await writePendingOfflineScans(pendingOfflineScansCache);
+}
+
+function mergePendingOfflineScans(items, pendingScans) {
+    if (!Array.isArray(pendingScans) || pendingScans.length === 0) {
+        return Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
+    }
+
+    const merged = Array.isArray(items) ? items.map((item) => cloneItem(item)) : [];
+    const seenKeys = new Set(merged.map((item) => item?.key).filter(Boolean));
+
+    pendingScans.forEach((scan) => {
+        if (!scan || seenKeys.has(scan.key)) {
+            return;
+        }
+
+        merged.push(cloneItem(scan));
+        seenKeys.add(scan.key);
+    });
+
+    return merged;
+}
+
+async function withOfflineSnapshot(path, items) {
+    if (path !== 'scans') {
+        return Array.isArray(items) ? items : [];
+    }
+
+    return mergePendingOfflineScans(items, await getPendingOfflineScansQueue());
+}
+
+function persistCollectionSnapshot(path, items) {
+    if (!supportsOfflineSnapshot(path)) {
+        return;
+    }
+
+    void writeOfflineCollectionSnapshot(path, items).catch(() => {});
 }
 
 function snapshotToArray(snapshot) {
@@ -127,6 +230,7 @@ function setCollectionData(path, items, version) {
         version,
     });
     collectionIndexes.set(path, buildCollectionIndexes(path, frozenItems, version));
+    persistCollectionSnapshot(path, frozenItems);
 
     return frozenItems;
 }
@@ -173,6 +277,14 @@ function appendCollectionItems(path, items) {
     setCollectionData(path, [...cachedItems, ...items], nextVersion);
 }
 
+function replaceCollectionItems(path, transform) {
+    const cachedItems = collectionCache.get(path)?.data || EMPTY_COLLECTION;
+    const nextVersion = getCollectionVersion(path) + 1;
+    const nextItems = transform([...cachedItems]);
+
+    return setCollectionData(path, nextItems, nextVersion);
+}
+
 async function getCollection(path) {
     const cachedEntry = collectionCache.get(path);
     const currentVersion = getCollectionVersion(path);
@@ -187,14 +299,31 @@ async function getCollection(path) {
 
     const requestVersion = currentVersion;
     const loadPromise = (async () => {
-        const snapshot = await get(query(ref(database, path)));
-        const items = snapshotToArray(snapshot);
+        try {
+            const snapshot = await get(query(ref(database, path)));
+            const items = await withOfflineSnapshot(path, snapshotToArray(snapshot));
 
-        if (getCollectionVersion(path) === requestVersion) {
-            return setCollectionData(path, items, requestVersion);
+            if (getCollectionVersion(path) === requestVersion) {
+                return setCollectionData(path, items, requestVersion);
+            }
+
+            return freezeCollection(items);
+        } catch (error) {
+            if (supportsOfflineSnapshot(path)) {
+                const offlineItems = await withOfflineSnapshot(
+                    path,
+                    await readOfflineCollectionSnapshot(path),
+                );
+
+                if (getCollectionVersion(path) === requestVersion) {
+                    return setCollectionData(path, offlineItems, requestVersion);
+                }
+
+                return freezeCollection(offlineItems);
+            }
+
+            throw error;
         }
-
-        return freezeCollection(items);
     })();
 
     collectionCache.set(path, { promise: loadPromise, version: requestVersion });
@@ -292,14 +421,14 @@ function subscribeCollection(path, onData, onError = null) {
 
     return onValue(
         collectionRef,
-        (snapshot) => {
-            const items = snapshotToArray(snapshot);
+        async (snapshot) => {
+            const items = await withOfflineSnapshot(path, snapshotToArray(snapshot));
             const nextVersion = getCollectionVersion(path) + 1;
             const frozenItems = setCollectionData(path, items, nextVersion);
 
             onData(frozenItems);
         },
-        (error) => {
+        async (error) => {
             captureException(error, {
                 operation: 'subscribe_collection',
                 path,
@@ -307,6 +436,17 @@ function subscribeCollection(path, onData, onError = null) {
                     scope: 'firebase',
                 },
             });
+
+            if (supportsOfflineSnapshot(path)) {
+                const offlineItems = await withOfflineSnapshot(
+                    path,
+                    await readOfflineCollectionSnapshot(path),
+                );
+
+                const nextVersion = getCollectionVersion(path) + 1;
+                onData(setCollectionData(path, offlineItems, nextVersion));
+            }
+
             if (typeof onError === 'function') {
                 onError(error);
             } else {
@@ -394,7 +534,27 @@ export async function saveDeliveries(courierId, courierName, deliveryIds) {
     return savedDeliveries;
 }
 
+async function queueOfflineScan(deliveryId, courierName, timestamp = Date.now()) {
+    const pendingScans = await getPendingOfflineScansQueue();
+    const offlineScan = {
+        courier_name: courierName,
+        delivery_id: deliveryId,
+        key: createOfflineScanKey(timestamp),
+        offlineQueued: true,
+        timestamp,
+    };
+
+    await persistPendingOfflineScansQueue([...pendingScans, offlineScan]);
+    appendCollectionItems('scans', [offlineScan]);
+
+    return offlineScan;
+}
+
 export async function saveScan(deliveryId, courierName, timestamp = Date.now()) {
+    if (!navigator.onLine) {
+        return queueOfflineScan(deliveryId, courierName, timestamp);
+    }
+
     const scanRef = push(ref(database, 'scans'));
     const record = {
         delivery_id: deliveryId,
@@ -406,10 +566,74 @@ export async function saveScan(deliveryId, courierName, timestamp = Date.now()) 
         ...record,
     };
 
-    await set(scanRef, record);
-    appendCollectionItems('scans', [savedScan]);
+    try {
+        await set(scanRef, record);
+        appendCollectionItems('scans', [savedScan]);
+        return savedScan;
+    } catch (error) {
+        if (!isConnectivityError(error)) {
+            throw error;
+        }
 
-    return savedScan;
+        return queueOfflineScan(deliveryId, courierName, timestamp);
+    }
+}
+
+export async function getPendingOfflineScanCount() {
+    return (await getPendingOfflineScansQueue()).length;
+}
+
+export async function flushPendingScans() {
+    const pendingScans = await getPendingOfflineScansQueue();
+
+    if (pendingScans.length === 0 || !navigator.onLine) {
+        return {
+            flushedCount: 0,
+            pendingCount: pendingScans.length,
+        };
+    }
+
+    let flushedCount = 0;
+    const remaining = [...pendingScans];
+
+    while (remaining.length > 0) {
+        const pendingScan = remaining[0];
+        const scanRef = push(ref(database, 'scans'));
+        const record = {
+            courier_name: pendingScan.courier_name,
+            delivery_id: pendingScan.delivery_id,
+            timestamp: pendingScan.timestamp || Date.now(),
+        };
+        const syncedScan = {
+            key: scanRef.key,
+            ...record,
+        };
+
+        try {
+            await set(scanRef, record);
+            remaining.shift();
+            flushedCount += 1;
+            await persistPendingOfflineScansQueue(remaining);
+            replaceCollectionItems('scans', (items) =>
+                items.map((item) => (
+                    item.key === pendingScan.key
+                        ? syncedScan
+                        : item
+                )),
+            );
+        } catch (error) {
+            if (isConnectivityError(error)) {
+                break;
+            }
+
+            throw error;
+        }
+    }
+
+    return {
+        flushedCount,
+        pendingCount: remaining.length,
+    };
 }
 
 export async function deleteAllDailyData() {

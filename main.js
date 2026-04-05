@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const THEME_STORAGE_KEY = 'appTheme';
     const BUTTON_PALETTE_STORAGE_KEY = 'appButtonPalette';
     const CUSTOM_THEME_STORAGE_KEY = 'appCustomTheme';
-    const APP_VERSION = 'v1.9.6';
+    const APP_VERSION = 'v1.9.7';
     const ADMIN_PANEL_PASSWORD_HASH =
         '35a092cbedd97769bf58b31dcb81324bceba0a55e0c7a61a6db37f8ec24e6784';
     const THEMES = ['light', 'blue', 'dark', 'custom'];
@@ -1838,6 +1838,7 @@ document.addEventListener('DOMContentLoaded', () => {
         exception: 'Исключение',
         log_message: 'Сообщение лога',
         manual_submit_invalid: 'Неверный ввод ID',
+        offline_scans_synced: 'Оффлайн-сканы синхронизированы',
         scan_debounce_resume_scheduled: 'Возобновление после debounce QR',
     };
 
@@ -3441,12 +3442,93 @@ document.addEventListener('DOMContentLoaded', () => {
         viewport: runtimeContext.viewport,
         visibilityState: runtimeContext.visibilityState,
     });
+
+    async function syncPendingOfflineScans(reason = 'online') {
+        try {
+            const result = await service.flushPendingScans?.();
+
+            if (!result || result.flushedCount <= 0) {
+                return result;
+            }
+
+            ui.showToast(
+                result.flushedCount === 1
+                    ? 'Оффлайн-скан синхронизирован'
+                    : `Оффлайн-сканы синхронизированы: ${result.flushedCount}`,
+                {
+                    duration: 2200,
+                },
+            );
+            trackEvent('offline_scans_synced', {
+                flushedCount: result.flushedCount,
+                pendingCount: result.pendingCount,
+                reason,
+            });
+            return result;
+        } catch (error) {
+            captureException(error, {
+                operation: 'flush_pending_offline_scans',
+                reason,
+                tags: {
+                    scope: 'offline_mode',
+                },
+            });
+            return null;
+        }
+    }
+
+    async function showOfflineModeNotice() {
+        const pendingCount = await service.getPendingOfflineScanCount?.().catch(() => 0);
+        const text = pendingCount > 0
+            ? `Оффлайн-режим: ${pendingCount} скан(ов) ждут отправки`
+            : 'Оффлайн-режим: доступны последние сохранённые данные';
+
+        ui.showToast(text, {
+            duration: 2400,
+            type: 'error',
+        });
+    }
+
+    async function registerOfflineSupport() {
+        if ('serviceWorker' in navigator) {
+            try {
+                await navigator.serviceWorker.register('./sw.js');
+            } catch (error) {
+                captureException(error, {
+                    operation: 'register_service_worker',
+                    tags: {
+                        scope: 'offline_mode',
+                    },
+                });
+            }
+        }
+
+        window.addEventListener('offline', () => {
+            void showOfflineModeNotice();
+        });
+
+        window.addEventListener('online', () => {
+            ui.showToast('Интернет появился, синхронизируем оффлайн-сканы', {
+                duration: 2200,
+            });
+            void syncPendingOfflineScans('browser_online');
+        });
+
+        if (navigator.onLine) {
+            void syncPendingOfflineScans('app_start');
+        } else {
+            void showOfflineModeNotice();
+        }
+    }
+
     setActiveBottomNav('home');
 
     const scheduleAdminWarmup =
         window.requestIdleCallback
             ? (callback) => window.requestIdleCallback(callback, { timeout: 1200 })
             : (callback) => window.setTimeout(callback, 250);
+
+    void registerOfflineSupport();
 
     scheduleAdminWarmup(() => {
         void Promise.allSettled([
