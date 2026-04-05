@@ -1723,7 +1723,25 @@ export function createCameraController({ state, dom, ui }) {
     }
 
     async function startZxingDecodeLoop(sessionId, cameraIdToUse, telemetry) {
-        await loadZxingLibrary('scan_start');
+        try {
+            await loadZxingLibrary('scan_start');
+        } catch (error) {
+            console.error('ZXing не загружен, требуется интернет:', error);
+            ui.showScanResult('error', 'Требуется интернет для первого сканирования', '', '');
+            captureMessage(
+                'ZXing library failed to load - offline or network error',
+                {
+                    errorName: error?.name || 'UnknownError',
+                    operation: 'load_zxing_library',
+                    tags: {
+                        scope: 'camera',
+                        offline: !navigator.onLine,
+                    },
+                },
+                'warning',
+            );
+            return;
+        }
 
         if (!isCurrentSession(sessionId) || !dom.videoElement) {
             return;

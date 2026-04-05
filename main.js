@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const THEME_STORAGE_KEY = 'appTheme';
     const BUTTON_PALETTE_STORAGE_KEY = 'appButtonPalette';
     const CUSTOM_THEME_STORAGE_KEY = 'appCustomTheme';
-    const APP_VERSION = 'v1.9.7.3';
+    const APP_VERSION = 'v1.9.7.4';
     const ADMIN_PANEL_PASSWORD_HASH =
         '35a092cbedd97769bf58b31dcb81324bceba0a55e0c7a61a6db37f8ec24e6784';
     const THEMES = ['light', 'blue', 'dark', 'custom'];
@@ -3442,6 +3442,13 @@ document.addEventListener('DOMContentLoaded', () => {
         viewport: runtimeContext.viewport,
         visibilityState: runtimeContext.visibilityState,
     });
+
+    // Preload collections for offline support
+    if (typeof service.preloadCollections === 'function') {
+        service.preloadCollections().catch((error) => {
+            console.error('Failed to preload collections:', error);
+        });
+    }
 
     async function syncPendingOfflineScans(reason = 'online') {
         try {

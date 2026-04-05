@@ -414,6 +414,26 @@ export async function getScans() {
     return getCollection('scans');
 }
 
+export async function preloadCollections() {
+    if (!navigator.onLine) {
+        console.log('Offline: skipping preload, will use cached data');
+        return;
+    }
+
+    try {
+        console.log('Preloading collections for offline support...');
+        await Promise.all([
+            getCollection('couriers'),
+            getCollection('deliveries'),
+            getCollection('scans'),
+        ]);
+        console.log('Collections preloaded successfully');
+    } catch (error) {
+        console.warn('Failed to preload collections:', error);
+        // Not critical - will use cache when needed
+    }
+}
+
 export async function getTelemetryEvents() {
     const items = await getCollection('telemetry_events');
     return [...items].sort((left, right) => (right.timestamp || 0) - (left.timestamp || 0));
@@ -430,9 +450,24 @@ export async function findMatchingDeliveriesByTransferId(rawTransferId) {
     }
 
     const deliveryIndex = await getCollectionIndex('deliveries');
-    const matches = parsedTransferId.isShort
+    let matches = parsedTransferId.isShort
         ? deliveryIndex.byShortId?.get(parsedTransferId.cleanedId) || EMPTY_COLLECTION
         : deliveryIndex.byNormalizedId?.get(parsedTransferId.cleanedId) || EMPTY_COLLECTION;
+
+    // Fallback: if no matches in index, search directly in collection
+    if (matches.length === 0) {
+        try {
+            const allDeliveries = await getCollection('deliveries');
+            matches = allDeliveries.filter((delivery) => {
+                if (parsedTransferId.isShort) {
+                    return normalizeDeliveryId(delivery.id)?.endsWith(parsedTransferId.cleanedId);
+                }
+                return normalizeDeliveryId(delivery.id) === parsedTransferId.cleanedId;
+            });
+        } catch (error) {
+            console.warn('Fallback delivery search failed:', error);
+        }
+    }
 
     return {
         ...parsedTransferId,
