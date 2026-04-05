@@ -222,7 +222,27 @@ document.addEventListener('DOMContentLoaded', () => {
         const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
         if (!appleTouchIcon) return;
         
-        if (themeName === 'dark') {
+        if (themeName === 'custom') {
+            // Для пользовательской темы - выбираем иконку по яркости фона
+            const backgroundHex = customThemeState?.background?.hex || '#3949AB';
+            const parseHex = (hex) => ({
+                r: Number.parseInt(hex.slice(1, 3), 16),
+                g: Number.parseInt(hex.slice(3, 5), 16),
+                b: Number.parseInt(hex.slice(5, 7), 16),
+            });
+            const getRelativeLuminance = (hex) => {
+                const { r, g, b } = parseHex(hex);
+                const channels = [r, g, b].map((channel) => {
+                    const normalized = channel / 255;
+                    return normalized <= 0.03928
+                        ? normalized / 12.92
+                        : ((normalized + 0.055) / 1.055) ** 2.4;
+                });
+                return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+            };
+            const isLightBackground = getRelativeLuminance(backgroundHex) > 0.5;
+            appleTouchIcon.href = isLightBackground ? 'app-icon-light.svg' : 'app-icon.svg';
+        } else if (themeName === 'dark') {
             appleTouchIcon.href = 'app-icon-dark.svg';
         } else if (themeName === 'light') {
             appleTouchIcon.href = 'app-icon-light.svg';
@@ -615,6 +635,7 @@ document.addEventListener('DOMContentLoaded', () => {
             '--nav-glider-bg': `linear-gradient(135deg, ${mixHexColors(buttonHex, '#FFFFFF', 0.34)}, ${buttonHex})`,
             '--nav-glider-shadow': `0 0 18px ${rgbaString(buttonHex, 0.36)}, 0 0 10px ${rgbaString(mixHexColors(buttonHex, '#FFFFFF', 0.42), 0.24)} inset`,
         });
+        updateAppIcon('custom');
     }
 
     let customThemeState = loadCustomThemeState();
