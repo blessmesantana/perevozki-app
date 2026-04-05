@@ -158,14 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const THEME_STORAGE_KEY = 'appTheme';
     const BUTTON_PALETTE_STORAGE_KEY = 'appButtonPalette';
     const CUSTOM_THEME_STORAGE_KEY = 'appCustomTheme';
-    const APP_VERSION = 'v1.9.7.4 beta';
+    const APP_VERSION = 'v1.9.7.5';
     const ADMIN_PANEL_PASSWORD_HASH =
         '35a092cbedd97769bf58b31dcb81324bceba0a55e0c7a61a6db37f8ec24e6784';
     const THEMES = ['light', 'blue', 'dark', 'custom'];
     const THEME_BROWSER_COLORS = {
         light: '#e8e8e8',
         blue: '#3949AB',
-        dark: '#141414',
+        dark: '#000000',
     };
     const BUTTON_PALETTES = ['default', 'pink', 'platinum', 'gold', 'white'];
     let cameraMenuVisible = false;
@@ -218,6 +218,19 @@ document.addEventListener('DOMContentLoaded', () => {
         cameraSelectHomeParent.appendChild(dom.cameraSelect);
     }
 
+    function updateAppIcon(themeName) {
+        const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
+        if (!appleTouchIcon) return;
+        
+        if (themeName === 'dark') {
+            appleTouchIcon.href = 'app-icon-dark.svg';
+        } else if (themeName === 'light') {
+            appleTouchIcon.href = 'app-icon-light.svg';
+        } else {
+            appleTouchIcon.href = 'app-icon.svg';
+        }
+    }
+
     function applyTheme(themeName) {
         const resolvedTheme = THEMES.includes(themeName) ? themeName : 'blue';
         document.documentElement.dataset.theme = resolvedTheme;
@@ -229,6 +242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clearCustomThemeState();
         }
         syncBrowserThemeColor(resolvedTheme);
+        updateAppIcon(resolvedTheme);
         setLoggerContext({ theme: resolvedTheme });
         return resolvedTheme;
     }

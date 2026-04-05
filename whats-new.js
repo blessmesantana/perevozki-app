@@ -1,6 +1,7 @@
 import { markNewBadgeSeen, shouldShowNewBadge } from './new-badges.js';
 
 const NEW_BADGE_VERSIONS = new Map([
+    ['v1.9.7.5', 'whats_new_v1.9.7.5'],
     ['v1.9.7.4', 'whats_new_v1.9.7.4'],
     ['v1.9.7.3', 'whats_new_v1.9.7.3'],
     ['v1.9.7', 'whats_new_v1.9.7'],
@@ -8,6 +9,15 @@ const NEW_BADGE_VERSIONS = new Map([
 ]);
 
 const WHATS_NEW_SECTIONS = [
+    {
+        version: 'v1.9.7.5',
+        items: [
+            {
+                title: 'Иконка приложения подстраивается под выбранную тему',
+                text: 'Значок приложения на главном экране теперь автоматически меняется в зависимости от активной темы. Цвет адресной строки браузера и полосы PWA также синхронизированы с темой. Это особенно заметно при запуске приложения через установленный значок на главный экран телефона.',
+            },
+        ],
+    },
     {
         version: 'v1.9.7.4',
         items: [
