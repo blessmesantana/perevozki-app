@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const THEME_STORAGE_KEY = 'appTheme';
     const BUTTON_PALETTE_STORAGE_KEY = 'appButtonPalette';
     const CUSTOM_THEME_STORAGE_KEY = 'appCustomTheme';
-    const APP_VERSION = 'v1.9.7.5.2 beta';
+    const APP_VERSION = 'v1.9.7.5.3 beta';
     const ADMIN_PANEL_PASSWORD_HASH =
         '35a092cbedd97769bf58b31dcb81324bceba0a55e0c7a61a6db37f8ec24e6784';
     const THEMES = ['light', 'blue', 'dark', 'custom'];
@@ -219,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateAppIcon(themeName) {
+        console.log('[updateAppIcon] Called with theme:', themeName);
         const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
         let iconHref = 'app-icon.svg';
         
@@ -252,6 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (appleTouchIcon) {
             appleTouchIcon.href = iconHrefWithVersion;
+            console.log('[updateAppIcon] Updated apple-touch-icon to:', iconHrefWithVersion);
+        } else {
+            console.log('[updateAppIcon] apple-touch-icon element not found');
         }
         
         // Также обновляем favicon
@@ -263,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.head.appendChild(favicon);
         }
         favicon.href = iconHrefWithVersion;
+        console.log('[updateAppIcon] Updated favicon to:', iconHrefWithVersion);
         
         // Обновляем manifest для PWA с новой иконкой и версией
         updateManifestForTheme(iconHref, themeName);
@@ -273,9 +278,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function updateManifestForTheme(iconFile, themeName) {
+        console.log('[updateManifestForTheme] Called with theme:', themeName, 'icon:', iconFile);
         // Динамически обновляем manifest для PWA с cache-busting версией
         const manifestLink = document.querySelector('link[rel="manifest"]');
-        if (!manifestLink) return;
+        if (!manifestLink) {
+            console.log('[updateManifestForTheme] Manifest link not found!');
+            return;
+        }
         
         const iconHrefWithVersion = `${iconFile}?v=${themeName}`;
         
@@ -301,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
         const manifestUrl = URL.createObjectURL(manifestBlob);
         manifestLink.href = manifestUrl;
+        console.log('[updateManifestForTheme] Updated manifest:', { bg: manifestData.background_color, theme: manifestData.theme_color, icon: iconHrefWithVersion });
         
         // Сохраняем в localStorage для восстановления при загрузке
         localStorage.setItem('appManifestTheme', themeName);
@@ -308,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function applyTheme(themeName) {
         const resolvedTheme = THEMES.includes(themeName) ? themeName : 'blue';
+        console.log('[applyTheme] Applying theme:', resolvedTheme);
         document.documentElement.dataset.theme = resolvedTheme;
         document.body.dataset.theme = resolvedTheme;
         localStorage.setItem(THEME_STORAGE_KEY, resolvedTheme);
@@ -319,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncBrowserThemeColor(resolvedTheme);
         updateAppIcon(resolvedTheme);
         setLoggerContext({ theme: resolvedTheme });
+        console.log('[applyTheme] Theme applied successfully');
         return resolvedTheme;
     }
 
