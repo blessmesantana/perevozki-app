@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const THEME_STORAGE_KEY = 'appTheme';
     const BUTTON_PALETTE_STORAGE_KEY = 'appButtonPalette';
     const CUSTOM_THEME_STORAGE_KEY = 'appCustomTheme';
-    const APP_VERSION = 'v1.9.7.5 beta';
+    const APP_VERSION = 'v1.9.7.5.2 beta';
     const ADMIN_PANEL_PASSWORD_HASH =
         '35a092cbedd97769bf58b31dcb81324bceba0a55e0c7a61a6db37f8ec24e6784';
     const THEMES = ['light', 'blue', 'dark', 'custom'];
@@ -220,10 +220,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateAppIcon(themeName) {
         const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
-        if (!appleTouchIcon) return;
+        let iconHref = 'app-icon.svg';
         
         if (themeName === 'custom') {
-            // Для пользовательской темы - выбираем иконку по яркости фона
             const backgroundHex = customThemeState?.background?.hex || '#3949AB';
             const parseHex = (hex) => ({
                 r: Number.parseInt(hex.slice(1, 3), 16),
@@ -241,14 +240,70 @@ document.addEventListener('DOMContentLoaded', () => {
                 return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
             };
             const isLightBackground = getRelativeLuminance(backgroundHex) > 0.5;
-            appleTouchIcon.href = isLightBackground ? 'app-icon-light.svg' : 'app-icon.svg';
+            iconHref = isLightBackground ? 'app-icon-light.svg' : 'app-icon.svg';
         } else if (themeName === 'dark') {
-            appleTouchIcon.href = 'app-icon-dark.svg';
+            iconHref = 'app-icon-dark.svg';
         } else if (themeName === 'light') {
-            appleTouchIcon.href = 'app-icon-light.svg';
-        } else {
-            appleTouchIcon.href = 'app-icon.svg';
+            iconHref = 'app-icon-light.svg';
         }
+        
+        // Cache-busting: добавляем версию темы в URL чтобы браузер загрузил новую иконку
+        const iconHrefWithVersion = `${iconHref}?v=${themeName}`;
+        
+        if (appleTouchIcon) {
+            appleTouchIcon.href = iconHrefWithVersion;
+        }
+        
+        // Также обновляем favicon
+        let favicon = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+        if (!favicon) {
+            favicon = document.createElement('link');
+            favicon.rel = 'icon';
+            favicon.type = 'image/svg+xml';
+            document.head.appendChild(favicon);
+        }
+        favicon.href = iconHrefWithVersion;
+        
+        // Обновляем manifest для PWA с новой иконкой и версией
+        updateManifestForTheme(iconHref, themeName);
+        
+        // Сохраняем информацию о текущей иконке
+        localStorage.setItem('appIconHref', iconHref);
+        localStorage.setItem('appIconTheme', themeName);
+    }
+    
+    function updateManifestForTheme(iconFile, themeName) {
+        // Динамически обновляем manifest для PWA с cache-busting версией
+        const manifestLink = document.querySelector('link[rel="manifest"]');
+        if (!manifestLink) return;
+        
+        const iconHrefWithVersion = `${iconFile}?v=${themeName}`;
+        
+        // Создаем blob с обновленным манифестом
+        const manifestData = {
+            name: 'Передачкин',
+            short_name: 'Передачкин',
+            start_url: './index.html',
+            scope: './',
+            display: 'standalone',
+            background_color: themeName === 'dark' ? '#000000' : (themeName === 'light' ? '#e8e8e8' : '#3949AB'),
+            theme_color: themeName === 'dark' ? '#000000' : (themeName === 'light' ? '#e8e8e8' : '#3949AB'),
+            icons: [
+                {
+                    src: iconHrefWithVersion,
+                    sizes: 'any',
+                    type: 'image/svg+xml',
+                    purpose: 'any maskable'
+                }
+            ]
+        };
+        
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        manifestLink.href = manifestUrl;
+        
+        // Сохраняем в localStorage для восстановления при загрузке
+        localStorage.setItem('appManifestTheme', themeName);
     }
 
     function applyTheme(themeName) {

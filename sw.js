@@ -21,6 +21,8 @@ const LOCAL_APP_SHELL_PATHS = [
     './shk-svg-data.js',
     './manifest.webmanifest',
     './app-icon.svg',
+    './app-icon-dark.svg',
+    './app-icon-light.svg',
 ];
 const REMOTE_APP_SHELL_URLS = [
     'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js',

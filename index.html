@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#4452b8">
+    <meta name="theme-color" content="#3949AB">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -189,6 +189,77 @@
                     || buttonPalette === 'white'
                 ) {
                     document.documentElement.dataset.buttonPalette = buttonPalette;
+                }
+                
+                // Восстанавливаем manifest для сохраненной темы
+                if (theme) {
+                    const updateManifest = () => {
+                        try {
+                            const manifestLink = document.querySelector('link[rel="manifest"]');
+                            if (!manifestLink) return;
+                            
+                            let iconFile = './app-icon.svg';
+                            let bgColor = '#3949AB';
+                            let themeColor = '#3949AB';
+                            
+                            if (theme === 'dark') {
+                                iconFile = './app-icon-dark.svg';
+                                bgColor = '#000000';
+                                themeColor = '#000000';
+                            } else if (theme === 'light') {
+                                iconFile = './app-icon-light.svg';
+                                bgColor = '#e8e8e8';
+                                themeColor = '#e8e8e8';
+                            } else if (theme === 'custom') {
+                                const customThemeRaw = localStorage.getItem('appCustomTheme');
+                                const customTheme = customThemeRaw ? JSON.parse(customThemeRaw) : null;
+                                const bgHex = normalizeHex(customTheme?.background?.hex, '#3949AB');
+                                bgColor = bgHex;
+                                themeColor = bgHex;
+                                
+                                // Для custom темы определяем иконку по luminance
+                                const getLuminance = (hex) => {
+                                    const { r, g, b } = parseHex(hex);
+                                    const channels = [r, g, b].map((channel) => {
+                                        const norm = channel / 255;
+                                        return norm <= 0.03928 ? norm / 12.92 : ((norm + 0.055) / 1.055) ** 2.4;
+                                    });
+                                    return (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
+                                };
+                                const isLight = getLuminance(bgHex) > 0.5;
+                                iconFile = isLight ? './app-icon-light.svg' : './app-icon.svg';
+                            }
+                            
+                            const iconHrefWithVersion = `${iconFile}?v=${theme}`;
+                            const manifestData = {
+                                name: 'Передачкин',
+                                short_name: 'Передачкин',
+                                start_url: './index.html',
+                                scope: './',
+                                display: 'standalone',
+                                background_color: bgColor,
+                                theme_color: themeColor,
+                                icons: [{
+                                    src: iconHrefWithVersion,
+                                    sizes: 'any',
+                                    type: 'image/svg+xml',
+                                    purpose: 'any maskable'
+                                }]
+                            };
+                            
+                            const blob = new Blob([JSON.stringify(manifestData)], { type: 'application/manifest+json' });
+                            const url = URL.createObjectURL(blob);
+                            manifestLink.href = url;
+                        } catch (e) {
+                            // Fallback: используем статический manifest
+                        }
+                    };
+                    
+                    // Обновляем manifest сразу и после загрузки DOM
+                    updateManifest();
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', updateManifest, { once: true });
+                    }
                 }
             } catch (error) {}
         })();
