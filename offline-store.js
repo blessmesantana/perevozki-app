@@ -1,3 +1,5 @@
+import { captureException, captureMessage } from './logger.js';
+
 const DB_NAME = 'peredachkin-offline';
 const DB_VERSION = 1;
 const COLLECTION_STORE = 'collections';
@@ -28,6 +30,7 @@ function canUseIndexedDb() {
 
 function openDb() {
     if (!canUseIndexedDb()) {
+        captureMessage('IndexedDB unavailable or disabled', { severity: 'info' });
         return Promise.resolve(null);
     }
 
@@ -53,15 +56,34 @@ function openDb() {
                 };
 
                 request.onsuccess = () => {
+                    captureMessage('IndexedDB opened successfully', { severity: 'debug' });
                     resolve(request.result);
                 };
 
                 request.onerror = () => {
+                    const error = request.error;
                     indexedDbUnavailable = true;
+                    
+                    if (error?.name === 'QuotaExceededError') {
+                        captureException(error, {
+                            operation: 'indexeddb_open',
+                            errorType: 'quota_exceeded',
+                        });
+                    } else {
+                        captureException(error, {
+                            operation: 'indexeddb_open',
+                            errorType: error?.name || 'unknown',
+                        });
+                    }
+                    
                     resolve(null);
                 };
             } catch (error) {
                 indexedDbUnavailable = true;
+                captureException(error, {
+                    operation: 'indexeddb_open',
+                    errorType: 'exception',
+                });
                 resolve(null);
             }
         });
@@ -73,6 +95,11 @@ function openDb() {
 function runTransaction(storeName, mode, executor) {
     return openDb().then((db) => {
         if (!db) {
+            captureMessage('Database not available for transaction', { 
+                severity: 'warning',
+                storeName,
+                mode,
+            });
             return null;
         }
 
@@ -82,13 +109,52 @@ function runTransaction(storeName, mode, executor) {
                 const store = transaction.objectStore(storeName);
                 const request = executor(store);
 
-                transaction.oncomplete = () => resolve(request?.result ?? null);
-                transaction.onerror = () => reject(transaction.error);
-                transaction.onabort = () => reject(transaction.error);
+                transaction.oncomplete = () => {
+                    resolve(request?.result ?? null);
+                };
+                
+                transaction.onerror = () => {
+                    const error = transaction.error;
+                    if (error?.name === 'QuotaExceededError') {
+                        captureException(error, {
+                            operation: 'indexeddb_transaction',
+                            storeName,
+                            mode,
+                            errorType: 'quota_exceeded',
+                        });
+                    } else {
+                        captureException(error, {
+                            operation: 'indexeddb_transaction',
+                            storeName,
+                            mode,
+                            errorType: error?.name || 'unknown',
+                        });
+                    }
+                    reject(error);
+                };
+                
+                transaction.onabort = () => {
+                    const error = transaction.error;
+                    captureMessage('IndexedDB transaction aborted', {
+                        severity: 'warning',
+                        storeName,
+                        errorType: error?.name || 'unknown',
+                    });
+                    reject(error);
+                };
             } catch (error) {
+                captureException(error, {
+                    operation: 'indexeddb_transaction_setup',
+                    storeName,
+                    mode,
+                });
                 reject(error);
             }
-        }).catch(() => null);
+        }).catch((error) => {
+            // Fallback gracefully - don't propagate IndexedDB errors
+            // This allows app to continue with localStorage fallback
+            return null;
+        });
     });
 }
 
@@ -102,6 +168,11 @@ function readLocalStorageJson(key, fallback) {
 
         return JSON.parse(raw);
     } catch (error) {
+        captureMessage('LocalStorage read failed', {
+            severity: 'warning',
+            key,
+            errorType: error?.name || 'parse_error',
+        });
         return fallback;
     }
 }
@@ -109,7 +180,21 @@ function readLocalStorageJson(key, fallback) {
 function writeLocalStorageJson(key, value) {
     try {
         localStorage.setItem(key, JSON.stringify(value));
-    } catch (error) {}
+    } catch (error) {
+        if (error?.name === 'QuotaExceededError') {
+            captureException(error, {
+                operation: 'localStorage_write',
+                errorType: 'quota_exceeded',
+                key,
+            });
+        } else {
+            captureMessage('LocalStorage write failed', {
+                severity: 'warning',
+                key,
+                errorType: error?.name || 'write_error',
+            });
+        }
+    }
 }
 
 export async function readOfflineCollectionSnapshot(path) {

@@ -4,6 +4,15 @@ import {
     setContext as setLoggerContext,
     trackEvent,
 } from './logger.js';
+import {
+    safeRequestCamera,
+    safeCloseStream,
+    safeAsyncCall,
+    categorizeError,
+    ERROR_CATEGORY,
+    createErrorObject,
+    getUriUserFriendlyMessage,
+} from './error-handler.js';
 
 const ZXING_SCRIPT_URL = 'https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';
 const CAMERA_DIAGNOSTIC_WINDOW_MS = 60_000;
@@ -1481,6 +1490,12 @@ export function createCameraController({ state, dom, ui }) {
     }
 
     async function requestCameraStream(cameraIdToUse) {
+        // КРИТИЧНО: Безопасный запрос камеры с обработкой всех типов ошибок
+        // - Разрешения: PermissionDeniedError, NotAllowedError
+        // - Устройство: NotFoundError, NotReadableError, OverconstrainedError
+        // - Таймаут: автоматический retry с exponential backoff
+        // - Cleanup: гарантированное закрытие потока при ошибке
+
         const fallbackConstraints = {
             video: {
                 facingMode: { ideal: 'environment' },
@@ -1491,56 +1506,148 @@ export function createCameraController({ state, dom, ui }) {
             },
         };
 
+        const exactCameraConstraints = (deviceId) => ({
+            video: {
+                deviceId: { exact: deviceId },
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 480, max: 480 },
+                height: { ideal: 480, max: 480 },
+                aspectRatio: 1,
+                frameRate: CAMERA_STREAM_FRAME_RATE,
+            },
+        });
+
+        // На iOS используем facingMode вместо deviceId
         if (isIOS()) {
             const facingMode =
                 cameraIdToUse === IOS_FRONT_CAMERA_ID ? 'user' : 'environment';
 
-            return navigator.mediaDevices.getUserMedia({
-                video: {
-                    facingMode: { ideal: facingMode },
-                    width: { ideal: 480, max: 480 },
-                    height: { ideal: 480, max: 480 },
-                    aspectRatio: 1,
-                    frameRate: CAMERA_STREAM_FRAME_RATE,
-                },
-            });
-        }
-
-        if (cameraIdToUse) {
             try {
-                return await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        deviceId: { exact: cameraIdToUse },
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 480, max: 480 },
-                        height: { ideal: 480, max: 480 },
-                        aspectRatio: 1,
-                        frameRate: CAMERA_STREAM_FRAME_RATE,
+                const stream = await safeRequestCamera(
+                    {
+                        video: {
+                            facingMode: { ideal: facingMode },
+                            width: { ideal: 480, max: 480 },
+                            height: { ideal: 480, max: 480 },
+                            aspectRatio: 1,
+                            frameRate: CAMERA_STREAM_FRAME_RATE,
+                        },
                     },
+                    {
+                        timeout: 5000,
+                        retries: 2,
+                        platform: 'ios',
+                        facingMode,
+                    }
+                );
+
+                trackEvent('camera_stream_acquired', {
+                    platform: 'ios',
+                    facingMode,
+                    screen: state.activeRootScreen,
                 });
+
+                return stream;
             } catch (error) {
-                debugCamera('exact_camera_request_failed', {
-                    cameraIdToUse,
-                    message: error?.message,
-                    name: error?.name,
+                const category = categorizeError(error);
+                debugCamera('ios_camera_request_failed', {
+                    facingMode,
+                    errorName: error?.name,
+                    category,
                 });
 
-                if (
-                    error?.name !== 'NotFoundError' &&
-                    error?.name !== 'OverconstrainedError' &&
-                    error?.name !== 'AbortError'
-                ) {
-                    throw error;
-                }
-
-                resetSelectedCamera('exact_camera_request_failed');
+                throw createErrorObject(category, error, {
+                    operation: 'request_camera_stream',
+                    platform: 'ios',
+                    facingMode,
+                });
             }
         }
 
+        // Пытаемся с конкретной камерой если указана
+        if (cameraIdToUse) {
+            try {
+                const stream = await safeRequestCamera(
+                    exactCameraConstraints(cameraIdToUse),
+                    {
+                        timeout: 5000,
+                        retries: 1,
+                        deviceId: cameraIdToUse,
+                        fallback: true,
+                    }
+                );
+
+                trackEvent('camera_stream_acquired_exact', {
+                    deviceId: cameraIdToUse,
+                    screen: state.activeRootScreen,
+                });
+
+                return stream;
+            } catch (error) {
+                const category = categorizeError(error);
+
+                debugCamera('exact_camera_request_failed', {
+                    cameraIdToUse,
+                    errorName: error?.name,
+                    category,
+                });
+
+                // Ошибки разрешений пробрасываем сразу
+                if (category === ERROR_CATEGORY.PERMISSION) {
+                    throw error;
+                }
+
+                // Для других ошибок пытаемся fallback и сбрасываем выбранную камеру
+                resetSelectedCamera('exact_camera_request_failed');
+                captureMessage(
+                    'Exact camera request failed, switching to fallback',
+                    {
+                        deviceId: cameraIdToUse,
+                        category,
+                        errorName: error?.name,
+                        operation: 'request_camera_stream',
+                        tags: { scope: 'camera' },
+                    },
+                    'warning'
+                );
+            }
+        }
+
+        // Fallback: запрашиваем любую камеру
         debugCamera('request_camera_stream_fallback', {
             selectedCameraId: state.selectedCameraId,
         });
-        return navigator.mediaDevices.getUserMedia(fallbackConstraints);
+
+        try {
+            const stream = await safeRequestCamera(
+                fallbackConstraints,
+                {
+                    timeout: 5000,
+                    retries: 2,
+                    fallback: true,
+                }
+            );
+
+            trackEvent('camera_stream_acquired_fallback', {
+                screen: state.activeRootScreen,
+            });
+
+            return stream;
+        } catch (error) {
+            const category = categorizeError(error);
+
+            captureException(error, {
+                operation: 'request_camera_stream_fallback',
+                category,
+                screen: state.activeRootScreen,
+                tags: { scope: 'camera' },
+            });
+
+            throw createErrorObject(category, error, {
+                operation: 'request_camera_stream_final',
+                isLastAttempt: true,
+            });
+        }
     }
 
     function observeNoDetectionFrame() {

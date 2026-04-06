@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const THEME_STORAGE_KEY = 'appTheme';
     const BUTTON_PALETTE_STORAGE_KEY = 'appButtonPalette';
     const CUSTOM_THEME_STORAGE_KEY = 'appCustomTheme';
-    const APP_VERSION = 'v1.9.7.5.3 beta';
+    const APP_VERSION = 'v1.9.8 beta';
     const ADMIN_PANEL_PASSWORD_HASH =
         '35a092cbedd97769bf58b31dcb81324bceba0a55e0c7a61a6db37f8ec24e6784';
     const THEMES = ['light', 'blue', 'dark', 'custom'];
@@ -3629,6 +3629,42 @@ document.addEventListener('DOMContentLoaded', () => {
             void showOfflineModeNotice();
         }
     }
+
+    // ===== PAGE CLEANUP HANDLER =====
+    // Ensures proper cleanup of resources when user leaves page
+    window.addEventListener('beforeunload', () => {
+        try {
+            // Stop scanner and close camera stream
+            if (scanner && typeof scanner.stopQrScanner === 'function') {
+                scanner.stopQrScanner('page_unload');
+            }
+            
+            // Close media stream if open
+            if (state.stream && typeof state.stream.getTracks === 'function') {
+                state.stream.getTracks().forEach((track) => {
+                    try {
+                        track.stop();
+                    } catch (err) {
+                        // Silently ignore track stop errors
+                    }
+                });
+            }
+            
+            // Clean up UI state
+            if (ui && typeof ui.cleanupUiState === 'function') {
+                ui.cleanupUiState();
+            }
+            
+            // Sync any pending offline scans before leaving
+            if (typeof syncPendingOfflineScans === 'function') {
+                void syncPendingOfflineScans('page_unload');
+            }
+        } catch (error) {
+            // Silently ignore cleanup errors to not interfere with page unload
+            console.warn('[beforeunload] Cleanup error:', error);
+        }
+    });
+    // ===== END CLEANUP HANDLER =====
 
     setActiveBottomNav('home');
 

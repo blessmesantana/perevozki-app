@@ -3,13 +3,14 @@ import {
     normalizeDeliveryId,
     parseTransferId,
 } from './deliveries.js';
-import { captureException } from './logger.js';
+import { captureException, captureMessage } from './logger.js';
 import {
     readOfflineCollectionSnapshot,
     readPendingOfflineScans,
     writeOfflineCollectionSnapshot,
     writePendingOfflineScans,
 } from './offline-store.js';
+import { categorizeError, ERROR_CATEGORY } from './error-handler.js';
 import {
     get,
     onValue,
@@ -399,7 +400,17 @@ async function removePaths(paths) {
         return;
     }
 
-    await update(ref(database), updates);
+    try {
+        await withTimeout(update(ref(database), updates), 5000);
+    } catch (error) {
+        const category = categorizeError(error);
+        captureException(error, {
+            operation: 'remove_paths',
+            errorCategory: category,
+            pathsCount: paths.length,
+        });
+        throw error;
+    }
 }
 
 export async function getCouriers() {
@@ -569,10 +580,19 @@ export async function saveCourier(courierName) {
         ...record,
     };
 
-    await set(courierRef, record);
-    appendCollectionItems('couriers', [savedCourier]);
-
-    return savedCourier;
+    try {
+        await withTimeout(set(courierRef, record), 5000);
+        appendCollectionItems('couriers', [savedCourier]);
+        return savedCourier;
+    } catch (error) {
+        const category = categorizeError(error);
+        captureException(error, {
+            operation: 'save_courier',
+            errorCategory: category,
+            courierName,
+        });
+        throw error;
+    }
 }
 
 export async function saveDeliveries(courierId, courierName, deliveryIds) {
@@ -595,8 +615,19 @@ export async function saveDeliveries(courierId, courierName, deliveryIds) {
             ...record,
         };
 
-        await set(deliveryRef, record);
-        savedDeliveries.push(savedDelivery);
+        try {
+            await withTimeout(set(deliveryRef, record), 5000);
+            savedDeliveries.push(savedDelivery);
+        } catch (error) {
+            const category = categorizeError(error);
+            captureException(error, {
+                operation: 'save_deliveries',
+                errorCategory: category,
+                courierId,
+                deliveryId,
+            });
+            throw error;
+        }
     }
 
     appendCollectionItems('deliveries', savedDeliveries);
@@ -637,15 +668,22 @@ export async function saveScan(deliveryId, courierName, timestamp = Date.now()) 
     };
 
     try {
-        await set(scanRef, record);
+        await withTimeout(set(scanRef, record), 5000);
         appendCollectionItems('scans', [savedScan]);
         return savedScan;
     } catch (error) {
-        if (!isConnectivityError(error)) {
-            throw error;
+        const category = categorizeError(error);
+        if (category === ERROR_CATEGORY.NETWORK || category === ERROR_CATEGORY.TIMEOUT) {
+            captureMessage(`Scan queued offline: ${deliveryId}`, { severity: 'info' });
+            return queueOfflineScan(deliveryId, courierName, timestamp);
         }
-
-        return queueOfflineScan(deliveryId, courierName, timestamp);
+        
+        captureException(error, {
+            operation: 'save_scan',
+            errorCategory: category,
+            deliveryId,
+        });
+        throw error;
     }
 }
 
@@ -680,7 +718,7 @@ export async function flushPendingScans() {
         };
 
         try {
-            await set(scanRef, record);
+            await withTimeout(set(scanRef, record), 5000);
             remaining.shift();
             flushedCount += 1;
             await persistPendingOfflineScansQueue(remaining);
@@ -692,10 +730,21 @@ export async function flushPendingScans() {
                 )),
             );
         } catch (error) {
-            if (isConnectivityError(error)) {
+            const category = categorizeError(error);
+            if (category === ERROR_CATEGORY.NETWORK || category === ERROR_CATEGORY.TIMEOUT) {
+                captureMessage(`Flush pending scans stopped: network issue`, { 
+                    severity: 'warning',
+                    flushedCount,
+                    remainingCount: remaining.length,
+                });
                 break;
             }
 
+            captureException(error, {
+                operation: 'flush_pending_scans',
+                errorCategory: category,
+                flushedCount,
+            });
             throw error;
         }
     }
@@ -707,22 +756,40 @@ export async function flushPendingScans() {
 }
 
 export async function deleteAllDailyData() {
-    await update(ref(database), {
-        couriers: null,
-        deliveries: null,
-        scans: null,
-    });
-    invalidateCollections(['couriers', 'deliveries', 'scans'], {
-        prefetch: true,
-    });
+    try {
+        await withTimeout(update(ref(database), {
+            couriers: null,
+            deliveries: null,
+            scans: null,
+        }), 5000);
+        invalidateCollections(['couriers', 'deliveries', 'scans'], {
+            prefetch: true,
+        });
+    } catch (error) {
+        const category = categorizeError(error);
+        captureException(error, {
+            operation: 'delete_all_daily_data',
+            errorCategory: category,
+        });
+        throw error;
+    }
 }
 
 export async function deleteAllDeliveriesAndScans() {
-    await update(ref(database), {
-        deliveries: null,
-        scans: null,
-    });
-    invalidateCollections(['deliveries', 'scans'], { prefetch: true });
+    try {
+        await withTimeout(update(ref(database), {
+            deliveries: null,
+            scans: null,
+        }), 5000);
+        invalidateCollections(['deliveries', 'scans'], { prefetch: true });
+    } catch (error) {
+        const category = categorizeError(error);
+        captureException(error, {
+            operation: 'delete_all_deliveries_and_scans',
+            errorCategory: category,
+        });
+        throw error;
+    }
 }
 
 export async function deleteCourierByName(courierName) {

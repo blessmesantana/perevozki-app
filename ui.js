@@ -28,6 +28,75 @@ export function createUiController({ dom }) {
     let currentRootScreen = null;
     let homeRootScreen = null;
 
+    // ===== UI STATE MACHINE =====
+    // States: idle, loading, success, error
+    let uiState = 'idle';
+    let uiStateResetTimer = null;
+    const UI_STATES = {
+        IDLE: 'idle',
+        LOADING: 'loading',
+        SUCCESS: 'success',
+        ERROR: 'error',
+    };
+
+    function setUiState(nextState) {
+        // Validate DOM before state transitions
+        if (!document.body.contains(dom.loadingIndicator) && dom.loadingIndicator) {
+            return; // Element has been removed from DOM
+        }
+
+        if (uiState === nextState) {
+            return; // No state change needed
+        }
+
+        // Clear previous state reset timer
+        if (uiStateResetTimer) {
+            clearTimeout(uiStateResetTimer);
+            uiStateResetTimer = null;
+        }
+
+        uiState = nextState;
+
+        // Auto-reset error states after 3 seconds
+        if (nextState === UI_STATES.ERROR) {
+            uiStateResetTimer = setTimeout(() => {
+                setUiState(UI_STATES.IDLE);
+            }, 3000);
+        }
+
+        // Auto-reset success states after 2 seconds
+        if (nextState === UI_STATES.SUCCESS) {
+            uiStateResetTimer = setTimeout(() => {
+                setUiState(UI_STATES.IDLE);
+            }, 2000);
+        }
+    }
+
+    function getUiState() {
+        return uiState;
+    }
+
+    function cleanupUiState() {
+        if (uiStateResetTimer) {
+            clearTimeout(uiStateResetTimer);
+            uiStateResetTimer = null;
+        }
+        setUiState(UI_STATES.IDLE);
+    }
+
+    function renderUiState() {
+        // Update loading indicator
+        if (dom.loadingIndicator && document.body.contains(dom.loadingIndicator)) {
+            const isLoading = uiState === UI_STATES.LOADING;
+            dom.loadingIndicator.style.display = isLoading ? 'block' : 'none';
+        }
+
+        // Update viewport for scan states
+        applyQrViewportState();
+    }
+
+    // ===== END STATE MACHINE =====
+
     function ensureScanPauseOverlay() {
         if (!dom.qrContainer) {
             return null;
@@ -198,11 +267,14 @@ export function createUiController({ dom }) {
     }
 
     function setLoading(active) {
-        if (dom.loadingIndicator) {
-            dom.loadingIndicator.style.display = active ? 'block' : 'none';
+        if (active) {
+            setUiState(UI_STATES.LOADING);
+        } else {
+            if (getUiState() === UI_STATES.LOADING) {
+                setUiState(UI_STATES.IDLE);
+            }
         }
-
-        applyQrViewportState();
+        renderUiState();
     }
 
     function setVideoVisible(isVisible) {
@@ -286,6 +358,13 @@ export function createUiController({ dom }) {
     function showToast(text, options = {}) {
         const type = options.type === 'error' ? 'error' : 'success';
         const duration = options.duration || 1600;
+
+        // Update UI state based on message type
+        if (type === 'error') {
+            setUiState(UI_STATES.ERROR);
+        } else {
+            setUiState(UI_STATES.SUCCESS);
+        }
 
         createFloatingMessage(text, type, duration);
     }
@@ -1132,5 +1211,10 @@ export function createUiController({ dom }) {
         showToast,
         showTransferSelectModal,
         syncOverlayStyles,
+        // State machine exports
+        setUiState,
+        getUiState,
+        cleanupUiState,
+        UI_STATES,
     };
 }
